@@ -17,7 +17,10 @@ button,input{font:inherit} button{border:0;background:none;color:inherit;cursor:
 header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;background:#fff;border-bottom:1px solid var(--line);z-index:20}
 .brand{font-size:19px;font-weight:850;white-space:nowrap}.floor-tabs{display:flex;gap:6px;overflow:auto;flex:1}
 .floor-tab{padding:8px 12px;background:#f0f0f5;border-radius:10px;font-weight:750;white-space:nowrap}
-.floor-tab.active{background:#18181d;color:#fff}.top-actions{display:flex;gap:6px}
+.floor-tab.active{background:#18181d;color:#fff}
+.floor-menu{position:fixed;z-index:90;display:none;min-width:170px;padding:7px;background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow)}
+.floor-menu.show{display:grid;gap:4px}.floor-menu button{padding:10px 12px;text-align:left;border-radius:9px;font-weight:700}.floor-menu button:hover{background:#f1f1f5}
+.top-actions{display:flex;gap:6px}
 .icon-btn,.tool{min-width:42px;height:42px;border-radius:12px;background:#f1f1f6;display:flex;align-items:center;justify-content:center;font-weight:750}
 .workspace{flex:1;min-height:0;display:flex}.sidebar{width:96px;padding:10px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:7px;z-index:10;overflow:auto}
 .tool{height:58px;flex-direction:column;gap:2px;font-size:12px;flex-shrink:0}.tool .emoji{font-size:20px}.tool.active{background:#18181d;color:#fff}
@@ -116,6 +119,11 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
   <div class="cats" id="cats"></div>
   <div class="items" id="items"></div>
 </div>
+<div class="floor-menu" id="floorMenu">
+  <button id="renameFloor">✏️ 重新命名</button>
+  <button id="duplicateFloor">⧉ 複製樓層</button>
+  <button id="deleteFloor" class="danger">🗑 刪除樓層</button>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -147,19 +155,32 @@ const CATALOG={
 
 function id(){return crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now()}
 function normalize(data){
-  if(!data||!data.floors)return {version:2,floors:[{id:id(),name:'1F',walls:[],objects:[]}],activeFloorId:null};
-  data.version=2;
-  data.floors.forEach(f=>{f.walls=f.walls||[];f.objects=f.objects||[]});
+  if(!data||!data.floors)return {version:3,floors:[{id:id(),name:'1F',walls:[],objects:[],view:{zoom:1,x:80,y:80}}],activeFloorId:null};
+  data.version=3;
+  data.floors.forEach(f=>{f.walls=f.walls||[];f.objects=f.objects||[];f.view=f.view||{zoom:1,x:80,y:80}});
   return data;
 }
 let app=normalize(load()); if(!app.activeFloorId)app.activeFloorId=app.floors[0].id;
 function floor(){return app.floors.find(f=>f.id===app.activeFloorId)}
-function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(app))}
+function storeView(){
+ const f=floor();if(!f)return;
+ f.view={zoom:zoom,x:camera.x,y:camera.y}
+}
+function loadView(){
+ const f=floor();const v=f?.view||{zoom:1,x:80,y:80};
+ zoom=v.zoom||1;camera={x:Number.isFinite(v.x)?v.x:80,y:Number.isFinite(v.y)?v.y:80};updateZoom()
+}
+function switchFloor(fid){
+ if(fid===app.activeFloorId)return;
+ storeView();app.activeFloorId=fid;selected=null;drawing=null;dragging=null;resizing=null;wallResizing=null;rotating=null;
+ loadView();save();renderFloors();updateProps();draw()
+}
+function save(){storeView();localStorage.setItem(STORAGE_KEY,JSON.stringify(app))}
 function load(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))}catch(e){return null}}
 function snap(v){return Math.round(v/GRID_CM)*GRID_CM}
 function snapPoint(p){return{x:snap(p.x),y:snap(p.y)}}
 function snapshot(){history.push(JSON.stringify(app));if(history.length>80)history.shift();future=[]}
-function restore(s){app=normalize(JSON.parse(s));selected=null;renderFloors();save();draw();updateProps()}
+function restore(s){app=normalize(JSON.parse(s));selected=null;loadView();renderFloors();save();draw();updateProps()}
 function undo(){if(!history.length)return toast('沒有可以復原的動作');future.push(JSON.stringify(app));restore(history.pop())}
 function redo(){if(!future.length)return toast('沒有可以重做的動作');history.push(JSON.stringify(app));restore(future.pop())}
 
@@ -510,17 +531,56 @@ canvas.addEventListener('pointerup',()=>{
    resizing=null;updateProps()
  }
  if(dragging){if(dragging.moved){let cur=JSON.parse(JSON.stringify(app)),f=cur.floors.find(x=>x.id===cur.activeFloorId);if(dragging.kind==='object'){let x=f.objects.find(x=>x.id===selected.id);Object.assign(x,dragging.orig)}else{let x=f.walls.find(x=>x.id===selected.id);Object.assign(x,dragging.orig)}history.push(JSON.stringify(cur));future=[];save()}dragging=null}
- panning=null
+ if(panning){storeView();save()}panning=null
 });
-canvas.addEventListener('wheel',e=>{e.preventDefault();let s=pointer(e),before=S2W(s);zoom=Math.max(.35,Math.min(3,zoom*(e.deltaY<0?1.1:.9)));let after=W2S(before);camera.x+=s.x-after.x;camera.y+=s.y-after.y;updateZoom();draw()},{passive:false});
+canvas.addEventListener('wheel',e=>{e.preventDefault();let s=pointer(e),before=S2W(s);zoom=Math.max(.35,Math.min(3,zoom*(e.deltaY<0?1.1:.9)));let after=W2S(before);camera.x+=s.x-after.x;camera.y+=s.y-after.y;updateZoom();storeView();save();draw()},{passive:false});
 
 function deleteSelected(){if(!selected)return toast('請先選擇物件');snapshot();if(selected.kind==='wall')floor().walls=floor().walls.filter(x=>x.id!==selected.id);else floor().objects=floor().objects.filter(x=>x.id!==selected.id);selected=null;updateProps();save();draw();toast('已刪除')}
 $('deleteBtn').onclick=deleteSelected;$('propDelete').onclick=deleteSelected;$('undoBtn').onclick=undo;$('redoBtn').onclick=redo;
-$('zoomIn').onclick=()=>{zoom=Math.min(3,zoom*1.2);updateZoom();draw()};$('zoomOut').onclick=()=>{zoom=Math.max(.35,zoom/1.2);updateZoom();draw()};
+$('zoomIn').onclick=()=>{zoom=Math.min(3,zoom*1.2);updateZoom();storeView();save();draw()};$('zoomOut').onclick=()=>{zoom=Math.max(.35,zoom/1.2);updateZoom();storeView();save();draw()};
 function updateZoom(){$('zoomLabel').textContent=Math.round(zoom*100)+'%'}
 
-function renderFloors(){$('floorTabs').innerHTML='';app.floors.forEach(f=>{let b=document.createElement('button');b.className='floor-tab'+(f.id===app.activeFloorId?' active':'');b.textContent=f.name;b.onclick=()=>{app.activeFloorId=f.id;selected=null;save();renderFloors();updateProps();draw()};$('floorTabs').appendChild(b)})}
-$('addFloorBtn').onclick=()=>{snapshot();let n=app.floors.length+1,f={id:id(),name:n+'F',walls:[],objects:[]};app.floors.push(f);app.activeFloorId=f.id;save();renderFloors();draw();toast('已新增 '+f.name)};
+let floorMenuTarget=null;
+function renderFloors(){
+ $('floorTabs').innerHTML='';
+ app.floors.forEach(f=>{
+   let b=document.createElement('button');b.className='floor-tab'+(f.id===app.activeFloorId?' active':'');b.textContent=f.name;b.title='點擊切換；右鍵管理樓層';
+   b.onclick=()=>switchFloor(f.id);
+   b.oncontextmenu=e=>{e.preventDefault();floorMenuTarget=f.id;openFloorMenu(e.clientX,e.clientY)};
+   let hold;
+   b.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')hold=setTimeout(()=>{floorMenuTarget=f.id;openFloorMenu(e.clientX,e.clientY)},600)});
+   ['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev,()=>clearTimeout(hold)));
+   $('floorTabs').appendChild(b)
+ })
+}
+function openFloorMenu(x,y){
+ const m=$('floorMenu');m.style.left=Math.min(x,innerWidth-185)+'px';m.style.top=Math.min(y,innerHeight-155)+'px';m.classList.add('show')
+}
+function closeFloorMenu(){$('floorMenu').classList.remove('show')}
+document.addEventListener('pointerdown',e=>{if(!$('floorMenu').contains(e.target)&&!e.target.classList.contains('floor-tab'))closeFloorMenu()});
+$('addFloorBtn').onclick=()=>{
+ snapshot();storeView();let n=app.floors.length+1,f={id:id(),name:n+'F',walls:[],objects:[],view:{zoom:1,x:80,y:80}};
+ app.floors.push(f);app.activeFloorId=f.id;selected=null;loadView();save();renderFloors();draw();toast('已新增獨立畫布 '+f.name)
+};
+$('renameFloor').onclick=()=>{
+ const f=app.floors.find(x=>x.id===floorMenuTarget);if(!f)return;
+ const name=prompt('樓層名稱',f.name);if(!name||!name.trim())return closeFloorMenu();
+ snapshot();f.name=name.trim();save();renderFloors();closeFloorMenu();toast('樓層已重新命名')
+};
+$('duplicateFloor').onclick=()=>{
+ const src=app.floors.find(x=>x.id===floorMenuTarget);if(!src)return;
+ snapshot();storeView();const copy=JSON.parse(JSON.stringify(src));copy.id=id();copy.name=src.name+' 複製';
+ copy.walls.forEach(x=>x.id=id());copy.objects.forEach(x=>x.id=id());
+ app.floors.push(copy);app.activeFloorId=copy.id;selected=null;loadView();save();renderFloors();draw();closeFloorMenu();toast('已複製成獨立樓層')
+};
+$('deleteFloor').onclick=()=>{
+ if(app.floors.length<=1){closeFloorMenu();return toast('至少要保留一個樓層')}
+ const f=app.floors.find(x=>x.id===floorMenuTarget);if(!f)return;
+ if(!confirm('確定刪除「'+f.name+'」整張畫布嗎？'))return;
+ snapshot();const wasActive=f.id===app.activeFloorId;app.floors=app.floors.filter(x=>x.id!==f.id);
+ if(wasActive)app.activeFloorId=app.floors[0].id;
+ selected=null;loadView();save();renderFloors();updateProps();draw();closeFloorMenu();toast('樓層已刪除')
+};
 $('saveBtn').onclick=()=>{save();toast('進度已儲存到這台裝置')};
 $('exportBtn').onclick=()=>{let old=selected;selected=null;draw();let a=document.createElement('a');a.download='FloorPlan-'+floor().name+'.png';a.href=canvas.toDataURL('image/png',1);a.click();selected=old;draw()};
 
@@ -611,7 +671,7 @@ $('addTextH').onclick=()=>addCustomText(false);$('addTextV').onclick=()=>addCust
 document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}if((e.key==='Delete'||e.key==='Backspace')&&selected){e.preventDefault();deleteSelected()}if(e.key==='Escape'){drawing=null;dragging=null;resizing=null;wallResizing=null;rotating=null;selected=null;placementType=null;updateProps();draw()}});
 function toast(m){$('toast').textContent=m;$('toast').classList.add('show');clearTimeout($('toast')._t);$('toast')._t=setTimeout(()=>$('toast').classList.remove('show'),1500)}
 
-renderFloors();resize();updateZoom();save();
+loadView();renderFloors();resize();updateZoom();save();
 })();
 </script>
 </body>
