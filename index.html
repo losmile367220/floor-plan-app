@@ -121,7 +121,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
 
 <div class="modal-backdrop" id="backdrop"></div>
 <div class="library" id="library">
-  <div class="lib-head"><strong>家具・設備</strong><button class="close" id="closeLibrary">×</button></div>
+  <div class="lib-head"><strong>彩色俯視家具・設備</strong><button class="close" id="closeLibrary">×</button></div>
   <div class="cats" id="cats"></div>
   <div class="items" id="items"></div>
 </div>
@@ -160,7 +160,7 @@ const CATALOG={
   ],
   '建築':[
     ['stairs','🪜','樓梯',100,240],['column','▣','柱子',40,40],['altar','🛕','神明桌',110,80],
-    ['motorcycle','🏍️','摩托車',80,190]
+    ['motorcycle','🏍️','摩托車',75,190]
   ]
 };
 
@@ -348,35 +348,205 @@ function drawWindow(o,ww,hh){
  ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(5,18*BASE*zoom);ctx.beginPath();ctx.moveTo(-ww/2,0);ctx.lineTo(ww/2,0);ctx.stroke();
  ctx.strokeStyle='#3487b7';ctx.lineWidth=2;[-2,2].forEach(d=>{ctx.beginPath();ctx.moveTo(-ww/2,d);ctx.lineTo(ww/2,d);ctx.stroke()})
 }
-function drawFurniture(o,ww,hh){
- box(ww,hh);
- switch(o.type){
-  case'bed':case'singlebed': ctx.strokeRect(-ww*.38,-hh*.38,ww*.76,hh*.24);ctx.beginPath();ctx.moveTo(-ww/2,-hh*.12);ctx.lineTo(ww/2,-hh*.12);ctx.stroke();label(o.label,ww,hh);break;
-  case'toilet': ctx.beginPath();ctx.ellipse(0,hh*.12,ww*.28,hh*.27,0,0,Math.PI*2);ctx.stroke();ctx.strokeRect(-ww*.28,-hh*.4,ww*.56,hh*.22);break;
-  case'sink':case'kitchensink': ctx.beginPath();ctx.ellipse(0,0,ww*.30,hh*.28,0,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(0,-hh*.20,4,0,Math.PI*2);ctx.stroke();break;
-  case'shower': ctx.beginPath();ctx.moveTo(-ww*.4,-hh*.4);ctx.lineTo(ww*.4,hh*.4);ctx.moveTo(ww*.4,-hh*.4);ctx.lineTo(-ww*.4,hh*.4);ctx.stroke();label('淋浴',ww,hh);break;
-  case'bathtub': ctx.beginPath();ctx.roundRect(-ww*.38,-hh*.32,ww*.76,hh*.64,Math.min(20,hh*.2));ctx.stroke();break;
-  case'fridge': ctx.beginPath();ctx.moveTo(-ww/2,0);ctx.lineTo(ww/2,0);ctx.stroke();ctx.beginPath();ctx.arc(ww*.30,-hh*.12,2,0,Math.PI*2);ctx.fill();label('冰箱',ww,hh);break;
-  case'cooktop': for(let x of[-.22,.22])for(let y of[-.18,.18]){ctx.beginPath();ctx.arc(ww*x,hh*y,Math.min(ww,hh)*.10,0,Math.PI*2);ctx.stroke()}break;
-  case'counter':case'cabinet': ctx.beginPath();for(let x=-ww*.3;x<=ww*.3;x+=ww*.3){ctx.moveTo(x,-hh/2);ctx.lineTo(x,hh/2)}ctx.stroke();label(o.label,ww,hh);break;
-  case'island': label('中島',ww,hh);break;
-  case'dining': ctx.strokeRect(-ww*.28,-hh*.25,ww*.56,hh*.5);for(let x of[-.38,.38])for(let y of[-.3,.3]){ctx.beginPath();ctx.arc(ww*x,hh*y,4,0,Math.PI*2);ctx.stroke()}break;
-  case'stairs':
-   for(let y=-hh*.4;y<=hh*.4;y+=Math.max(7,hh/10)){ctx.beginPath();ctx.moveTo(-ww*.42,y);ctx.lineTo(ww*.42,y);ctx.stroke()}
-   ctx.beginPath();
-   if(o.stairsDown){
-     ctx.moveTo(0,-hh*.34);ctx.lineTo(0,hh*.34);ctx.lineTo(-6,hh*.25);ctx.moveTo(0,hh*.34);ctx.lineTo(6,hh*.25)
-   }else{
-     ctx.moveTo(0,hh*.34);ctx.lineTo(0,-hh*.34);ctx.lineTo(-6,-hh*.25);ctx.moveTo(0,-hh*.34);ctx.lineTo(6,-hh*.25)
-   }
-   ctx.stroke();label(o.stairsDown?'下':'上',ww,hh);break;
-  case'column': ctx.fillStyle='#777';ctx.fillRect(-ww/2,-hh/2,ww,hh);break;
-  case'altar': label('神明桌',ww,hh);break;
-  case'motorcycle': ctx.beginPath();ctx.arc(0,-hh*.28,ww*.23,0,Math.PI*2);ctx.arc(0,hh*.28,ww*.23,0,Math.PI*2);ctx.stroke();label('機車',ww,hh);break;
-  default: label(o.label||'家具',ww,hh)
- }
+function rr(x,y,w,h,r,fill,stroke='#333'){
+ ctx.beginPath();ctx.roundRect(x,y,w,h,Math.min(r,Math.abs(w)/2,Math.abs(h)/2));
+ if(fill){ctx.fillStyle=fill;ctx.fill()}
+ if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1.5;ctx.stroke()}
 }
-function nearestWall(p,max=90){
+function ellipse(cx,cy,rx,ry,fill,stroke='#333'){
+ ctx.beginPath();ctx.ellipse(cx,cy,Math.max(1,rx),Math.max(1,ry),0,0,Math.PI*2);
+ if(fill){ctx.fillStyle=fill;ctx.fill()}
+ if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1.5;ctx.stroke()}
+}
+function shadowBox(x,y,w,h,r=6){
+ ctx.save();ctx.shadowColor='rgba(0,0,0,.18)';ctx.shadowBlur=7;ctx.shadowOffsetY=3;
+ rr(x,y,w,h,r,'rgba(255,255,255,.01)',null);ctx.restore()
+}
+function woodGradient(x,y,w,h){
+ const g=ctx.createLinearGradient(x,y,x+w,y+h);
+ g.addColorStop(0,'#d6a35d');g.addColorStop(.45,'#b97833');g.addColorStop(1,'#8b5728');return g
+}
+function metalGradient(x,y,w,h){
+ const g=ctx.createLinearGradient(x,y,x+w,y+h);
+ g.addColorStop(0,'#f7f7f7');g.addColorStop(.45,'#cfd3d6');g.addColorStop(1,'#8e969c');return g
+}
+function fabricGradient(c1,c2){
+ const g=ctx.createLinearGradient(0,-50,0,50);g.addColorStop(0,c1);g.addColorStop(1,c2);return g
+}
+function drawFurniture(o,ww,hh){
+ ctx.save();
+ const L=-ww/2,R=ww/2,T=-hh/2,B=hh/2;
+ shadowBox(L,T,ww,hh,Math.min(12,Math.min(ww,hh)*.12));
+
+ switch(o.type){
+  case'bed':
+  case'singlebed':{
+    rr(L,T,ww,hh,Math.min(10,ww*.08),'#c7a26b','#6e5332');
+    rr(L+ww*.06,T+hh*.05,ww*.88,hh*.90,Math.min(10,ww*.06),fabricGradient('#f5efe4','#ddd3c4'),'#827b73');
+    rr(L+ww*.10,T+hh*.08,ww*.36,hh*.18,6,'#fffdf7','#a69e95');
+    rr(R-ww*.46,T+hh*.08,ww*.36,hh*.18,6,'#fffdf7','#a69e95');
+    ctx.fillStyle=o.type==='bed'?'rgba(179,207,232,.58)':'rgba(183,215,238,.58)';
+    rr(L+ww*.08,T+hh*.30,ww*.84,hh*.62,8,ctx.fillStyle,'#9bb2c4');
+    ctx.strokeStyle='rgba(255,255,255,.65)';ctx.lineWidth=1;
+    for(let y=T+hh*.38;y<B-hh*.05;y+=Math.max(8,hh*.14)){ctx.beginPath();ctx.moveTo(L+ww*.10,y);ctx.lineTo(R-ww*.10,y);ctx.stroke()}
+    break;
+  }
+  case'wardrobe':{
+    rr(L,T,ww,hh,4,woodGradient(L,T,ww,hh),'#6f4827');
+    ctx.strokeStyle='#6f4827';ctx.beginPath();ctx.moveTo(0,T);ctx.lineTo(0,B);ctx.stroke();
+    ellipse(-ww*.07,0,2.5,2.5,'#d6c39d',null);ellipse(ww*.07,0,2.5,2.5,'#d6c39d',null);
+    break;
+  }
+  case'desk':{
+    rr(L,T,ww,hh,5,woodGradient(L,T,ww,hh),'#70431f');
+    rr(L+ww*.08,T+hh*.15,ww*.84,hh*.15,3,'rgba(255,255,255,.15)',null);
+    break;
+  }
+  case'sofa':{
+    rr(L,T,ww,hh,Math.min(14,hh*.18),fabricGradient('#e8dfcf','#c9bba7'),'#7c7369');
+    rr(L+ww*.08,T+hh*.10,ww*.84,hh*.80,Math.min(12,hh*.16),'#e5dccd','#8d8378');
+    rr(L+ww*.11,T+hh*.16,ww*.35,hh*.68,10,'#ddd3c4','#aaa097');
+    rr(R-ww*.46,T+hh*.16,ww*.35,hh*.68,10,'#ddd3c4','#aaa097');
+    rr(L,T+hh*.12,ww*.10,hh*.76,8,'#c7baa8','#776f67');
+    rr(R-ww*.10,T+hh*.12,ww*.10,hh*.76,8,'#c7baa8','#776f67');
+    break;
+  }
+  case'tv':{
+    rr(L,T,ww,hh,4,'#25282b','#050505');
+    rr(L+ww*.08,T+hh*.12,ww*.84,hh*.62,3,'#101820','#555');
+    ctx.fillStyle='#555';ctx.fillRect(-ww*.05,B-hh*.18,ww*.10,hh*.12);
+    ctx.fillRect(-ww*.22,B-hh*.08,ww*.44,hh*.05);
+    break;
+  }
+  case'toilet':{
+    rr(-ww*.30,T+hh*.05,ww*.60,hh*.27,8,'#f7f7f4','#8c9194');
+    ellipse(0,hh*.13,ww*.28,hh*.32,'#fafafa','#8c9194');
+    ellipse(0,hh*.13,ww*.17,hh*.20,'#e8eef0','#a3a8ab');
+    rr(-ww*.22,T+hh*.06,ww*.44,hh*.12,6,'#fff','#a3a8ab');
+    break;
+  }
+  case'sink':
+  case'kitchensink':{
+    rr(L,T,ww,hh,5,o.type==='kitchensink'?woodGradient(L,T,ww,hh):'#f4f4f1','#777');
+    ellipse(0,0,ww*.30,hh*.28,metalGradient(L,T,ww,hh),'#686f73');
+    ellipse(0,0,ww*.18,hh*.16,'#eef3f4','#9aa1a5');
+    ctx.strokeStyle='#777';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,-hh*.18,ww*.09,Math.PI,Math.PI*2);ctx.stroke();
+    break;
+  }
+  case'shower':{
+    rr(L,T,ww,hh,3,'rgba(197,225,238,.42)','#6ea7be');
+    ctx.strokeStyle='rgba(110,167,190,.42)';ctx.lineWidth=1;
+    for(let x=L+8;x<R;x+=12){ctx.beginPath();ctx.moveTo(x,T);ctx.lineTo(x,B);ctx.stroke()}
+    for(let y=T+8;y<B;y+=12){ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(R,y);ctx.stroke()}
+    ctx.strokeStyle='#68757c';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,T+hh*.22,ww*.12,0,Math.PI);ctx.stroke();
+    for(let a=-1;a<=1;a++){ctx.beginPath();ctx.moveTo(a*ww*.08,T+hh*.29);ctx.lineTo(a*ww*.11,T+hh*.42);ctx.stroke()}
+    ellipse(R-ww*.15,B-hh*.15,ww*.05,hh*.05,'#aab4b9','#6d7478');
+    break;
+  }
+  case'bathtub':{
+    rr(L,T,ww,hh,Math.min(18,hh*.28),'#f8f8f5','#8d9498');
+    rr(L+ww*.07,T+hh*.10,ww*.86,hh*.78,Math.min(15,hh*.24),'#d9edf3','#9eb7c0');
+    ellipse(R-ww*.14,T+hh*.18,3,3,'#8c969b',null);
+    break;
+  }
+  case'washer':{
+    rr(L,T,ww,hh,6,'#f1f2f3','#858b8e');
+    ellipse(0,0,ww*.28,hh*.28,'#a8c2cf','#58656b');
+    ellipse(0,0,ww*.20,hh*.20,'#526d79','#30434c');
+    rr(L+ww*.08,T+hh*.08,ww*.36,hh*.10,3,'#cfd4d6','#8a9194');
+    break;
+  }
+  case'fridge':{
+    rr(L,T,ww,hh,6,metalGradient(L,T,ww,hh),'#6f777c');
+    ctx.strokeStyle='#7f8589';ctx.beginPath();ctx.moveTo(L,T+hh*.38);ctx.lineTo(R,T+hh*.38);ctx.stroke();
+    rr(R-ww*.12,T+hh*.12,ww*.025,hh*.20,2,'#555',null);
+    rr(R-ww*.12,T+hh*.48,ww*.025,hh*.20,2,'#555',null);
+    break;
+  }
+  case'cooktop':{
+    rr(L,T,ww,hh,5,'#33383c','#111');
+    for(let x of[-.24,.24])for(let y of[-.20,.20]){
+      ellipse(ww*x,hh*y,Math.min(ww,hh)*.12,Math.min(ww,hh)*.12,'#17191a','#8a8f92');
+      ellipse(ww*x,hh*y,Math.min(ww,hh)*.055,Math.min(ww,hh)*.055,'#555','#999');
+    }
+    break;
+  }
+  case'counter':
+  case'cabinet':{
+    rr(L,T,ww,hh,4,woodGradient(L,T,ww,hh),'#6e4729');
+    ctx.strokeStyle='rgba(80,45,20,.55)';ctx.lineWidth=1;
+    const n=Math.max(2,Math.round(ww/55));
+    for(let i=1;i<n;i++){let x=L+ww*i/n;ctx.beginPath();ctx.moveTo(x,T);ctx.lineTo(x,B);ctx.stroke()}
+    break;
+  }
+  case'island':{
+    rr(L,T,ww,hh,6,woodGradient(L,T,ww,hh),'#6b4223');
+    rr(L+ww*.04,T+hh*.06,ww*.92,hh*.16,4,'rgba(255,255,255,.15)',null);
+    break;
+  }
+  case'dining':{
+    rr(-ww*.28,-hh*.28,ww*.56,hh*.56,6,woodGradient(-ww*.28,-hh*.28,ww*.56,hh*.56),'#68411f');
+    const chairs=[[-ww*.34,-hh*.32],[ww*.34,-hh*.32],[-ww*.34,hh*.32],[ww*.34,hh*.32]];
+    chairs.forEach(([x,y])=>rr(x-ww*.10,y-hh*.10,ww*.20,hh*.20,5,'#b77935','#68411f'));
+    break;
+  }
+  case'stairs':{
+    rr(L,T,ww,hh,3,'#d6b88a','#5f5040');
+    ctx.strokeStyle='#756551';ctx.lineWidth=1.4;
+    for(let y=T+hh*.08;y<B;y+=Math.max(7,hh/10)){ctx.beginPath();ctx.moveTo(L+ww*.08,y);ctx.lineTo(R-ww*.08,y);ctx.stroke()}
+    ctx.strokeStyle='#222';ctx.lineWidth=2.5;ctx.beginPath();
+    if(o.stairsDown){ctx.moveTo(0,T+hh*.12);ctx.lineTo(0,B-hh*.12);ctx.lineTo(-6,B-hh*.23);ctx.moveTo(0,B-hh*.12);ctx.lineTo(6,B-hh*.23)}
+    else{ctx.moveTo(0,B-hh*.12);ctx.lineTo(0,T+hh*.12);ctx.lineTo(-6,T+hh*.23);ctx.moveTo(0,T+hh*.12);ctx.lineTo(6,T+hh*.23)}
+    ctx.stroke();
+    ctx.fillStyle='#222';ctx.font='700 10px sans-serif';ctx.textAlign='center';ctx.fillText(o.stairsDown?'DOWN':'UP',0,hh*.04);
+    break;
+  }
+  case'column':{
+    const g=ctx.createRadialGradient(-ww*.15,-hh*.15,1,0,0,Math.max(ww,hh)/2);
+    g.addColorStop(0,'#d7d7d7');g.addColorStop(1,'#777');rr(L,T,ww,hh,2,g,'#555');break;
+  }
+  case'altar':{
+    rr(L,T,ww,hh,4,woodGradient(L,T,ww,hh),'#5d2c0f');
+    rr(L+ww*.08,T+hh*.10,ww*.84,hh*.70,3,'#8b3d13','#4e210a');
+    rr(L+ww*.15,T+hh*.18,ww*.70,hh*.42,3,'#b64e12','#6b260a');
+    ctx.fillStyle='#e6b84b';ctx.font=`700 ${Math.max(10,Math.min(16,ww*.13))}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('神',0,-hh*.03);
+    ellipse(-ww*.20,hh*.24,ww*.05,ww*.05,'#d6a324','#7a5210');ellipse(ww*.20,hh*.24,ww*.05,ww*.05,'#d6a324','#7a5210');
+    break;
+  }
+  case'motorcycle':{
+    // realistic-ish top-view scooter
+    ctx.save();
+    const bodyW=ww*.42;
+    ellipse(0,T+hh*.16,bodyW*.34,hh*.10,'#202326','#050505');
+    rr(-bodyW*.34,T+hh*.20,bodyW*.68,hh*.18,bodyW*.24,'#d9d9d9','#222');
+    // mirrors / handlebars
+    ctx.strokeStyle='#232323';ctx.lineWidth=Math.max(2,ww*.025);
+    ctx.beginPath();ctx.moveTo(-bodyW*.28,T+hh*.28);ctx.lineTo(-ww*.40,T+hh*.22);ctx.moveTo(bodyW*.28,T+hh*.28);ctx.lineTo(ww*.40,T+hh*.22);ctx.stroke();
+    ellipse(-ww*.42,T+hh*.20,ww*.055,hh*.025,'#bfc7ca','#222');
+    ellipse(ww*.42,T+hh*.20,ww*.055,hh*.025,'#bfc7ca','#222');
+    // front fairing
+    rr(-bodyW*.40,T+hh*.31,bodyW*.80,hh*.18,bodyW*.28,'#efefef','#202020');
+    rr(-bodyW*.46,T+hh*.36,bodyW*.12,hh*.28,bodyW*.05,'#d22c25','#7d0f0c');
+    rr(bodyW*.34,T+hh*.36,bodyW*.12,hh*.28,bodyW*.05,'#d22c25','#7d0f0c');
+    // seat
+    rr(-bodyW*.34,T+hh*.46,bodyW*.68,hh*.34,bodyW*.28,fabricGradient('#33383b','#0d0f10'),'#000');
+    rr(-bodyW*.28,T+hh*.48,bodyW*.56,hh*.17,bodyW*.20,'#1c1f21','#080808');
+    // rear side panels
+    rr(-bodyW*.45,T+hh*.68,bodyW*.16,hh*.18,bodyW*.06,'#d62d25','#7b100e');
+    rr(bodyW*.29,T+hh*.68,bodyW*.16,hh*.18,bodyW*.06,'#d62d25','#7b100e');
+    // rear light + wheel
+    ellipse(0,B-hh*.10,bodyW*.28,hh*.10,'#202326','#050505');
+    rr(-bodyW*.20,B-hh*.22,bodyW*.40,hh*.08,bodyW*.06,'#e9e9e9','#333');
+    rr(-bodyW*.09,B-hh*.19,bodyW*.18,hh*.05,3,'#d51e18','#6f0b08');
+    ctx.restore();
+    break;
+  }
+  default:{
+    rr(L,T,ww,hh,5,'#eeeeee','#555');label(o.label||'家具',ww,hh)
+  }
+ }
+ ctx.restore()
+}function nearestWall(p,max=90){
  let best=null,bd=Infinity,proj=null;
  for(const w of floor().walls){
   const ax=w.a.x,ay=w.a.y,bx=w.b.x,by=w.b.y,dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;if(!l2)continue;
