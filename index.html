@@ -28,7 +28,9 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
 .bottom{display:none;height:72px;background:#fff;border-top:1px solid var(--line);padding:7px 6px calc(7px + env(safe-area-inset-bottom));z-index:20}.bottom .tool{flex:1;height:55px}
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:40;display:none}.modal-backdrop.show{display:block}
 .library{position:fixed;left:50%;bottom:0;transform:translateX(-50%) translateY(105%);width:min(760px,100%);max-height:72dvh;background:#fff;border-radius:22px 22px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.18);z-index:50;transition:.2s ease;display:flex;flex-direction:column}
-.library.show{transform:translateX(-50%) translateY(0)}.lib-head{display:flex;align-items:center;padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+.library.show{transform:translateX(-50%) translateY(0)}
+.custom-panel{position:fixed;left:50%;bottom:0;transform:translateX(-50%) translateY(105%);width:min(520px,100%);background:#fff;border-radius:22px 22px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.18);z-index:55;transition:.2s ease}
+.custom-panel.show{transform:translateX(-50%) translateY(0)}.lib-head{display:flex;align-items:center;padding:14px 16px 10px;border-bottom:1px solid var(--line)}
 .lib-head strong{font-size:17px;flex:1}.close{width:38px;height:38px;border-radius:50%;background:#f1f1f5;font-size:20px}
 .cats{display:flex;gap:7px;overflow:auto;padding:10px 12px;border-bottom:1px solid var(--line)}.cat{padding:8px 12px;background:#f1f1f5;border-radius:999px;white-space:nowrap;font-weight:700;font-size:13px}.cat.active{background:#18181d;color:#fff}
 .items{padding:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:9px;overflow:auto}.item{min-height:84px;border:1px solid var(--line);border-radius:14px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px}.item .ico{font-size:30px}.item span:last-child{font-size:12px;font-weight:700;text-align:center}
@@ -48,6 +50,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
     <button class="icon-btn optional" id="undoBtn" title="復原">↶</button>
     <button class="icon-btn optional" id="redoBtn" title="重做">↷</button>
     <button class="icon-btn" id="addFloorBtn" title="新增樓層">＋F</button>
+    <button class="icon-btn" id="saveBtn" title="儲存進度">💾</button>
     <button class="icon-btn" id="exportBtn" title="匯出 PNG">⬇</button>
   </div>
 </header>
@@ -59,6 +62,8 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
   <button class="tool" data-tool="door"><span class="emoji">🚪</span>門</button>
   <button class="tool" data-tool="window"><span class="emoji">🪟</span>窗</button>
   <button class="tool" data-tool="library"><span class="emoji">🛋️</span>家具</button>
+  <button class="tool" data-tool="shape"><span class="emoji">⬜</span>圖形</button>
+  <button class="tool" data-tool="text"><span class="emoji">T</span>文字</button>
   <button class="tool" data-tool="pan"><span class="emoji">✋</span>移動畫布</button>
   <button class="tool" id="deleteBtn"><span class="emoji">🗑️</span>刪除</button>
 </aside>
@@ -76,6 +81,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
   <button class="tool" data-tool="door"><span class="emoji">🚪</span>門</button>
   <button class="tool" data-tool="window"><span class="emoji">🪟</span>窗</button>
   <button class="tool" data-tool="library"><span class="emoji">🛋️</span>家具</button>
+  <button class="tool" data-tool="more"><span class="emoji">＋</span>更多</button>
 </nav>
 </div>
 
@@ -83,8 +89,29 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
   <h3 id="propTitle">物件</h3>
   <div class="row"><label>寬</label><input id="propW" type="number" min="20" step="10"><span>cm</span></div>
   <div class="row"><label>深</label><input id="propH" type="number" min="20" step="10"><span>cm</span></div>
+  <div class="row" id="doorDirectionRow" style="display:none"><label>門向</label><button class="smallbtn" id="doorLeftRight">左右翻轉</button><button class="smallbtn" id="doorInOut">內外翻轉</button></div>
+  <div class="row" id="stairsDirectionRow" style="display:none"><label>樓梯</label><button class="smallbtn" id="stairsDirection">切換 上 / 下</button></div>
+  <div class="row" id="textDirectionRow" style="display:none"><label>文字</label><button class="smallbtn" id="textDirection">橫 ↔ 直</button></div>
   <div class="row"><button class="smallbtn" id="rotateLeft">↶ 旋轉</button><button class="smallbtn" id="rotateRight">↷ 旋轉</button></div>
   <div class="row"><button class="smallbtn" id="duplicateBtn">⧉ 複製</button><button class="smallbtn danger" id="propDelete">🗑 刪除</button></div>
+</div>
+
+<div class="custom-panel" id="customPanel">
+  <div class="lib-head"><strong id="customTitle">新增</strong><button class="close" id="closeCustom">×</button></div>
+  <div style="padding:14px;display:grid;gap:10px">
+    <div id="shapeChoices" style="display:none;grid-template-columns:repeat(3,1fr);gap:8px">
+      <button class="item" data-shape="rect"><span class="ico">⬜</span><span>矩形</span></button>
+      <button class="item" data-shape="square"><span class="ico">◻️</span><span>正方形</span></button>
+      <button class="item" data-shape="circle"><span class="ico">⚪</span><span>圓形</span></button>
+    </div>
+    <div id="textChoices" style="display:none;gap:8px">
+      <input id="customText" placeholder="輸入文字，例如：主臥、神明桌" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="smallbtn" id="addTextH">橫向文字</button>
+        <button class="smallbtn" id="addTextV">直向文字</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="modal-backdrop" id="backdrop"></div>
@@ -171,14 +198,39 @@ function drawWall(wall,sel=false,preview=false){
 function drawObject(o,sel=false){
  const c=W2S({x:o.x,y:o.y}),ww=o.w*BASE*zoom,hh=o.h*BASE*zoom;ctx.save();ctx.translate(c.x,c.y);ctx.rotate((o.rot||0)*Math.PI/180);
  if(sel){ctx.strokeStyle='rgba(108,99,255,.7)';ctx.lineWidth=3;ctx.setLineDash([6,4]);ctx.strokeRect(-ww/2-5,-hh/2-5,ww+10,hh+10);ctx.setLineDash([])}
- if(o.type==='door')drawDoor(o,ww,hh); else if(o.type==='window')drawWindow(o,ww,hh); else drawFurniture(o,ww,hh);
+ if(o.type==='door')drawDoor(o,ww,hh);
+ else if(o.type==='window')drawWindow(o,ww,hh);
+ else if(o.type==='shapeRect'||o.type==='shapeSquare'||o.type==='shapeCircle')drawShape(o,ww,hh);
+ else if(o.type==='text')drawTextObject(o,ww,hh);
+ else drawFurniture(o,ww,hh);
  ctx.restore()
 }
 function box(ww,hh){ctx.fillStyle='#fafafa';ctx.strokeStyle='#33343a';ctx.lineWidth=2;ctx.fillRect(-ww/2,-hh/2,ww,hh);ctx.strokeRect(-ww/2,-hh/2,ww,hh)}
 function label(txt,ww,hh){ctx.fillStyle='#3d3d45';ctx.font=`600 ${Math.max(10,Math.min(14,ww/8))}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,0,Math.min(hh/2-9,hh*.28))}
 function drawDoor(o,ww,hh){
- ctx.strokeStyle='#222';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-ww/2,0);ctx.lineTo(ww/2,0);ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(5,18*BASE*zoom);ctx.stroke();
- ctx.strokeStyle='#222';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-ww/2,0);ctx.lineTo(-ww/2,-ww);ctx.stroke();ctx.beginPath();ctx.arc(-ww/2,0,ww,-Math.PI/2,0);ctx.stroke()
+ const hingeRight=!!o.hingeRight, outward=!!o.outward;
+ const hx=hingeRight?ww/2:-ww/2, sx=hingeRight?-1:1, sy=outward?1:-1;
+ ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(5,18*BASE*zoom);ctx.beginPath();ctx.moveTo(-ww/2,0);ctx.lineTo(ww/2,0);ctx.stroke();
+ ctx.strokeStyle='#222';ctx.lineWidth=2;
+ ctx.beginPath();ctx.moveTo(hx,0);ctx.lineTo(hx,sy*ww);ctx.stroke();
+ ctx.beginPath();
+ if(!hingeRight && !outward) ctx.arc(hx,0,ww,-Math.PI/2,0);
+ if(!hingeRight && outward) ctx.arc(hx,0,ww,0,Math.PI/2);
+ if(hingeRight && !outward) ctx.arc(hx,0,ww,Math.PI,Math.PI*1.5);
+ if(hingeRight && outward) ctx.arc(hx,0,ww,Math.PI/2,Math.PI);
+ ctx.stroke()
+}
+function drawShape(o,ww,hh){
+ ctx.strokeStyle='#33343a';ctx.fillStyle='rgba(245,245,248,.7)';ctx.lineWidth=2;
+ if(o.type==='shapeCircle'){ctx.beginPath();ctx.ellipse(0,0,ww/2,hh/2,0,0,Math.PI*2);ctx.fill();ctx.stroke()}
+ else{ctx.fillRect(-ww/2,-hh/2,ww,hh);ctx.strokeRect(-ww/2,-hh/2,ww,hh)}
+}
+function drawTextObject(o,ww,hh){
+ ctx.fillStyle='#222';ctx.font=`700 ${Math.max(14,Math.min(28,(o.fontSize||22)*zoom))}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+ if(o.vertical){
+   const chars=[...(o.text||'文字')], lineH=Math.max(18,(o.fontSize||22)*1.15*zoom), start=-(chars.length-1)*lineH/2;
+   chars.forEach((ch,i)=>ctx.fillText(ch,0,start+i*lineH));
+ }else ctx.fillText(o.text||'文字',0,0);
 }
 function drawWindow(o,ww,hh){
  ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(5,18*BASE*zoom);ctx.beginPath();ctx.moveTo(-ww/2,0);ctx.lineTo(ww/2,0);ctx.stroke();
@@ -197,7 +249,15 @@ function drawFurniture(o,ww,hh){
   case'counter':case'cabinet': ctx.beginPath();for(let x=-ww*.3;x<=ww*.3;x+=ww*.3){ctx.moveTo(x,-hh/2);ctx.lineTo(x,hh/2)}ctx.stroke();label(o.label,ww,hh);break;
   case'island': label('中島',ww,hh);break;
   case'dining': ctx.strokeRect(-ww*.28,-hh*.25,ww*.56,hh*.5);for(let x of[-.38,.38])for(let y of[-.3,.3]){ctx.beginPath();ctx.arc(ww*x,hh*y,4,0,Math.PI*2);ctx.stroke()}break;
-  case'stairs': for(let y=-hh*.4;y<=hh*.4;y+=Math.max(7,hh/10)){ctx.beginPath();ctx.moveTo(-ww*.42,y);ctx.lineTo(ww*.42,y);ctx.stroke()}ctx.beginPath();ctx.moveTo(0,hh*.34);ctx.lineTo(0,-hh*.34);ctx.lineTo(-6,-hh*.25);ctx.moveTo(0,-hh*.34);ctx.lineTo(6,-hh*.25);ctx.stroke();break;
+  case'stairs':
+   for(let y=-hh*.4;y<=hh*.4;y+=Math.max(7,hh/10)){ctx.beginPath();ctx.moveTo(-ww*.42,y);ctx.lineTo(ww*.42,y);ctx.stroke()}
+   ctx.beginPath();
+   if(o.stairsDown){
+     ctx.moveTo(0,-hh*.34);ctx.lineTo(0,hh*.34);ctx.lineTo(-6,hh*.25);ctx.moveTo(0,hh*.34);ctx.lineTo(6,hh*.25)
+   }else{
+     ctx.moveTo(0,hh*.34);ctx.lineTo(0,-hh*.34);ctx.lineTo(-6,-hh*.25);ctx.moveTo(0,-hh*.34);ctx.lineTo(6,-hh*.25)
+   }
+   ctx.stroke();label(o.stairsDown?'下':'上',ww,hh);break;
   case'column': ctx.fillStyle='#777';ctx.fillRect(-ww/2,-hh/2,ww,hh);break;
   case'altar': label('神明桌',ww,hh);break;
   case'motorcycle': ctx.beginPath();ctx.arc(0,-hh*.28,ww*.23,0,Math.PI*2);ctx.arc(0,hh*.28,ww*.23,0,Math.PI*2);ctx.stroke();label('機車',ww,hh);break;
@@ -223,6 +283,9 @@ function getSelected(){if(!selected)return null;return selected.kind==='wall'?fl
 
 function setTool(t){
  if(t==='library'){openLibrary();return}
+ if(t==='shape'){openCustom('shape');return}
+ if(t==='text'){openCustom('text');return}
+ if(t==='more'){openCustom('shape');return}
  tool=t;placementType=null;selected=null;updateProps();
  document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));
  $('status').textContent=t==='wall'?'畫牆：拖曳起點到終點｜吸附 20 cm 格線':t==='door'?'門：點一下牆壁放置門':t==='window'?'窗：點一下牆壁放置窗':t==='pan'?'拖曳移動畫布':'選取：點牆或家具後可拖曳';
@@ -234,8 +297,20 @@ canvas.addEventListener('pointerdown',e=>{
  canvas.setPointerCapture(e.pointerId);let s=pointer(e),raw=S2W(s),w=snapPoint(raw);
  if(tool==='wall'){drawing={a:w,b:w,thickness:20};return draw()}
  if(tool==='pan'){panning={sx:s.x,sy:s.y,cx:camera.x,cy:camera.y};return}
- if(tool==='door'||tool==='window'){let n=nearestWall(raw);if(!n)return toast('請點在牆壁附近');snapshot();floor().objects.push({id:id(),type:tool,label:tool==='door'?'門':'窗',x:n.p.x,y:n.p.y,w:tool==='door'?90:120,h:20,rot:n.angle});save();draw();toast(tool==='door'?'門已放置':'窗已放置');return}
- if(placementType){let def=findDef(placementType);snapshot();let p=snapPoint(raw);let o={id:id(),type:def[0],label:def[2],x:p.x,y:p.y,w:def[3],h:def[4],rot:0};floor().objects.push(o);save();selected={kind:'object',id:o.id};placementType=null;setTool('select');updateProps();draw();toast(def[2]+' 已放置');return}
+ if(tool==='door'||tool==='window'){let n=nearestWall(raw);if(!n)return toast('請點在牆壁附近');snapshot();floor().objects.push({id:id(),type:tool,label:tool==='door'?'門':'窗',x:n.p.x,y:n.p.y,w:tool==='door'?90:120,h:20,rot:n.angle,hingeRight:false,outward:false});save();draw();toast(tool==='door'?'門已放置':'窗已放置');return}
+ if(placementType){
+ snapshot();let p=snapPoint(raw),o,label;
+ if(placementType.startsWith('__customShape__')){
+   let s=placementType.replace('__customShape__',''),map={rect:['shapeRect','矩形',140,90],square:['shapeSquare','正方形',100,100],circle:['shapeCircle','圓形',100,100]},d=map[s];
+   o={id:id(),type:d[0],label:d[1],x:p.x,y:p.y,w:d[2],h:d[3],rot:0};label=d[1]
+ }else if(placementType.startsWith('__customText__')){
+   let rest=placementType.replace('__customText__',''),parts=rest.split('|'),vertical=parts[0]==='V',text=decodeURIComponent(parts.slice(1).join('|'));
+   o={id:id(),type:'text',label:'文字',text,vertical,x:p.x,y:p.y,w:Math.max(80,text.length*30),h:vertical?Math.max(80,text.length*32):60,rot:0,fontSize:22};label='文字'
+ }else{
+   let def=findDef(placementType);o={id:id(),type:def[0],label:def[2],x:p.x,y:p.y,w:def[3],h:def[4],rot:0};if(def[0]==='stairs')o.stairsDown=false;label=def[2]
+ }
+ floor().objects.push(o);save();selected={kind:'object',id:o.id};placementType=null;setTool('select');updateProps();draw();toast(label+' 已放置');return
+}
  if(tool==='select'){selected=hit(raw);updateProps();if(selected){let obj=getSelected();dragging={start:raw,orig:JSON.parse(JSON.stringify(obj)),kind:selected.kind,moved:false}}draw()}
 });
 canvas.addEventListener('pointermove',e=>{
@@ -258,16 +333,24 @@ function updateZoom(){$('zoomLabel').textContent=Math.round(zoom*100)+'%'}
 
 function renderFloors(){$('floorTabs').innerHTML='';app.floors.forEach(f=>{let b=document.createElement('button');b.className='floor-tab'+(f.id===app.activeFloorId?' active':'');b.textContent=f.name;b.onclick=()=>{app.activeFloorId=f.id;selected=null;save();renderFloors();updateProps();draw()};$('floorTabs').appendChild(b)})}
 $('addFloorBtn').onclick=()=>{snapshot();let n=app.floors.length+1,f={id:id(),name:n+'F',walls:[],objects:[]};app.floors.push(f);app.activeFloorId=f.id;save();renderFloors();draw();toast('已新增 '+f.name)};
+$('saveBtn').onclick=()=>{save();toast('進度已儲存到這台裝置')};
 $('exportBtn').onclick=()=>{let old=selected;selected=null;draw();let a=document.createElement('a');a.download='FloorPlan-'+floor().name+'.png';a.href=canvas.toDataURL('image/png',1);a.click();selected=old;draw()};
 
 function updateProps(){
  let box=$('props'),o=getSelected();if(!o||selected.kind!=='object'){box.classList.remove('show');return}
- box.classList.add('show');$('propTitle').textContent=o.label||'物件';$('propW').value=Math.round(o.w);$('propH').value=Math.round(o.h)
+ box.classList.add('show');$('propTitle').textContent=o.label||'物件';$('propW').value=Math.round(o.w);$('propH').value=Math.round(o.h);
+ $('doorDirectionRow').style.display=o.type==='door'?'flex':'none';
+ $('stairsDirectionRow').style.display=o.type==='stairs'?'flex':'none';
+ $('textDirectionRow').style.display=o.type==='text'?'flex':'none';
 }
 function changeSize(){let o=getSelected();if(!o||selected.kind!=='object')return;snapshot();o.w=Math.max(20,+$('propW').value||o.w);o.h=Math.max(20,+$('propH').value||o.h);save();draw()}
 $('propW').onchange=changeSize;$('propH').onchange=changeSize;
 function rotate(d){let o=getSelected();if(!o||selected.kind!=='object')return;snapshot();o.rot=((o.rot||0)+d+360)%360;save();draw()}
 $('rotateLeft').onclick=()=>rotate(-90);$('rotateRight').onclick=()=>rotate(90);
+$('doorLeftRight').onclick=()=>{let o=getSelected();if(!o||o.type!=='door')return;snapshot();o.hingeRight=!o.hingeRight;save();draw()};
+$('doorInOut').onclick=()=>{let o=getSelected();if(!o||o.type!=='door')return;snapshot();o.outward=!o.outward;save();draw()};
+$('stairsDirection').onclick=()=>{let o=getSelected();if(!o||o.type!=='stairs')return;snapshot();o.stairsDown=!o.stairsDown;save();draw()};
+$('textDirection').onclick=()=>{let o=getSelected();if(!o||o.type!=='text')return;snapshot();o.vertical=!o.vertical;save();draw()};
 $('duplicateBtn').onclick=()=>{let o=getSelected();if(!o||selected.kind!=='object')return;snapshot();let c={...o,id:id(),x:o.x+40,y:o.y+40};floor().objects.push(c);selected={kind:'object',id:c.id};save();updateProps();draw();toast('已複製')};
 
 function renderLibrary(cat=Object.keys(CATALOG)[0]){
@@ -277,7 +360,29 @@ function renderLibrary(cat=Object.keys(CATALOG)[0]){
 function findDef(type){for(const arr of Object.values(CATALOG))for(const d of arr)if(d[0]===type)return d}
 function openLibrary(){$('backdrop').classList.add('show');$('library').classList.add('show');renderLibrary()}
 function closeLibrary(){$('backdrop').classList.remove('show');$('library').classList.remove('show')}
-$('closeLibrary').onclick=closeLibrary;$('backdrop').onclick=closeLibrary;
+$('closeLibrary').onclick=closeLibrary;$('backdrop').onclick=()=>{closeLibrary();closeCustom()};
+
+
+function openCustom(kind){
+ closeLibrary();
+ $('backdrop').classList.add('show');$('customPanel').classList.add('show');
+ $('customTitle').textContent=kind==='shape'?'新增圖形':'新增文字';
+ $('shapeChoices').style.display=kind==='shape'?'grid':'none';
+ $('textChoices').style.display=kind==='text'?'block':'none';
+}
+function closeCustom(){$('customPanel').classList.remove('show');if(!$('library').classList.contains('show'))$('backdrop').classList.remove('show')}
+$('closeCustom').onclick=closeCustom;
+document.querySelectorAll('[data-shape]').forEach(b=>b.onclick=()=>{
+ const s=b.dataset.shape, map={rect:['shapeRect','矩形',140,90],square:['shapeSquare','正方形',100,100],circle:['shapeCircle','圓形',100,100]},d=map[s];
+ placementType='__customShape__'+s;closeCustom();tool='select';selected=null;
+ $('status').textContent='點畫布放置：'+d[1];canvas.style.cursor='crosshair'
+});
+function addCustomText(vertical){
+ const text=$('customText').value.trim();if(!text)return toast('請先輸入文字');
+ closeCustom();placementType='__customText__'+(vertical?'V':'H')+'|'+encodeURIComponent(text);tool='select';selected=null;
+ $('status').textContent='點畫布放置文字：'+text;canvas.style.cursor='crosshair'
+}
+$('addTextH').onclick=()=>addCustomText(false);$('addTextV').onclick=()=>addCustomText(true);
 
 document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}if((e.key==='Delete'||e.key==='Backspace')&&selected){e.preventDefault();deleteSelected()}if(e.key==='Escape'){drawing=null;selected=null;placementType=null;updateProps();draw()}});
 function toast(m){$('toast').textContent=m;$('toast').classList.add('show');clearTimeout($('toast')._t);$('toast')._t=setTimeout(()=>$('toast').classList.remove('show'),1500)}
