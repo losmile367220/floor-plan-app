@@ -1,460 +1,288 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-<meta name="theme-color" content="#f7f7fb" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#f7f7fb">
 <title>Floor Plan</title>
 <style>
-  :root{
-    --bg:#f7f7fb; --panel:#ffffff; --text:#17171b; --muted:#777783;
-    --line:#d9d9e2; --accent:#6c63ff; --danger:#d94b4b;
-    --shadow:0 8px 24px rgba(0,0,0,.08);
-  }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;background:var(--bg);color:var(--text)}
-  button,input{font:inherit}
-  button{border:0;background:none;color:inherit;cursor:pointer}
-  .app{height:100dvh;display:flex;flex-direction:column}
-  header{
-    height:64px;display:flex;align-items:center;gap:12px;padding:0 16px;
-    background:rgba(255,255,255,.95);border-bottom:1px solid var(--line);z-index:10
-  }
-  .brand{font-weight:800;font-size:20px;white-space:nowrap}
-  .floor-tabs{display:flex;gap:6px;overflow:auto;flex:1}
-  .floor-tab{
-    padding:8px 12px;border-radius:10px;background:#f0f0f5;font-weight:700;white-space:nowrap
-  }
-  .floor-tab.active{background:#17171b;color:#fff}
-  .top-actions{display:flex;gap:6px}
-  .icon-btn,.tool{
-    min-width:42px;height:42px;border-radius:12px;background:#f1f1f6;
-    display:flex;align-items:center;justify-content:center;font-weight:700
-  }
-  .workspace{flex:1;min-height:0;display:flex}
-  .sidebar{
-    width:92px;padding:12px 10px;background:#fff;border-right:1px solid var(--line);
-    display:flex;flex-direction:column;gap:8px;z-index:8
-  }
-  .tool{height:58px;flex-direction:column;gap:2px;font-size:12px}
-  .tool .emoji{font-size:20px}
-  .tool.active{background:#17171b;color:#fff}
-  .canvas-wrap{position:relative;flex:1;overflow:hidden;background:#ececf2;touch-action:none}
-  canvas{display:block;width:100%;height:100%;background:#fff;touch-action:none}
-  .status{
-    position:absolute;left:14px;top:14px;background:rgba(255,255,255,.94);
-    box-shadow:var(--shadow);padding:8px 11px;border-radius:10px;font-size:12px;color:var(--muted);pointer-events:none
-  }
-  .zoom{
-    position:absolute;right:14px;bottom:14px;background:#fff;box-shadow:var(--shadow);
-    border-radius:14px;padding:6px;display:flex;align-items:center;gap:4px
-  }
-  .zoom button{width:40px;height:40px;border-radius:10px;background:#f1f1f6;font-weight:800;font-size:18px}
-  .zoom span{min-width:52px;text-align:center;font-size:12px;color:var(--muted)}
-  .bottom{
-    display:none;height:70px;background:#fff;border-top:1px solid var(--line);
-    padding:8px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
-    z-index:10
-  }
-  .bottom .tool{flex:1;height:54px}
-  .sheet{
-    position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
-    background:#fff;border:1px solid var(--line);box-shadow:var(--shadow);border-radius:16px;
-    padding:12px;display:none;gap:8px;z-index:30;align-items:center
-  }
-  .sheet.show{display:flex}
-  .sheet label{font-size:13px;color:var(--muted)}
-  .sheet input{width:90px;padding:9px;border:1px solid var(--line);border-radius:9px}
-  .primary{background:#17171b!important;color:#fff!important}
-  .danger{color:var(--danger)}
-  .toast{
-    position:fixed;left:50%;top:82px;transform:translateX(-50%) translateY(-10px);
-    padding:9px 14px;background:#17171b;color:#fff;border-radius:999px;font-size:13px;
-    opacity:0;pointer-events:none;transition:.18s;z-index:50
-  }
-  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  @media(max-width:760px){
-    header{height:56px;padding:0 10px}
-    .brand{font-size:17px}
-    .sidebar{display:none}
-    .bottom{display:flex;gap:6px}
-    .top-actions .optional{display:none}
-    .status{top:10px;left:10px}
-    .zoom{right:10px;bottom:10px}
-  }
+:root{
+  --bg:#f6f6fa;--panel:#fff;--text:#18181d;--muted:#777783;--line:#dddde5;
+  --accent:#6c63ff;--danger:#d94b4b;--shadow:0 10px 30px rgba(0,0,0,.10)
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;background:var(--bg);color:var(--text)}
+button,input{font:inherit} button{border:0;background:none;color:inherit;cursor:pointer}
+.app{height:100dvh;display:flex;flex-direction:column}
+header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;background:#fff;border-bottom:1px solid var(--line);z-index:20}
+.brand{font-size:19px;font-weight:850;white-space:nowrap}.floor-tabs{display:flex;gap:6px;overflow:auto;flex:1}
+.floor-tab{padding:8px 12px;background:#f0f0f5;border-radius:10px;font-weight:750;white-space:nowrap}
+.floor-tab.active{background:#18181d;color:#fff}.top-actions{display:flex;gap:6px}
+.icon-btn,.tool{min-width:42px;height:42px;border-radius:12px;background:#f1f1f6;display:flex;align-items:center;justify-content:center;font-weight:750}
+.workspace{flex:1;min-height:0;display:flex}.sidebar{width:96px;padding:10px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:7px;z-index:10;overflow:auto}
+.tool{height:58px;flex-direction:column;gap:2px;font-size:12px;flex-shrink:0}.tool .emoji{font-size:20px}.tool.active{background:#18181d;color:#fff}
+.canvas-wrap{position:relative;flex:1;overflow:hidden;background:#ececf2;touch-action:none}canvas{display:block;width:100%;height:100%;background:#fff;touch-action:none}
+.status{position:absolute;left:14px;top:14px;background:rgba(255,255,255,.94);box-shadow:var(--shadow);padding:8px 11px;border-radius:10px;font-size:12px;color:var(--muted);pointer-events:none;max-width:70%}
+.zoom{position:absolute;right:14px;bottom:14px;background:#fff;box-shadow:var(--shadow);border-radius:14px;padding:6px;display:flex;align-items:center;gap:4px}
+.zoom button{width:38px;height:38px;border-radius:10px;background:#f1f1f6;font-size:18px;font-weight:800}.zoom span{min-width:50px;text-align:center;font-size:12px;color:var(--muted)}
+.bottom{display:none;height:72px;background:#fff;border-top:1px solid var(--line);padding:7px 6px calc(7px + env(safe-area-inset-bottom));z-index:20}.bottom .tool{flex:1;height:55px}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:40;display:none}.modal-backdrop.show{display:block}
+.library{position:fixed;left:50%;bottom:0;transform:translateX(-50%) translateY(105%);width:min(760px,100%);max-height:72dvh;background:#fff;border-radius:22px 22px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.18);z-index:50;transition:.2s ease;display:flex;flex-direction:column}
+.library.show{transform:translateX(-50%) translateY(0)}.lib-head{display:flex;align-items:center;padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+.lib-head strong{font-size:17px;flex:1}.close{width:38px;height:38px;border-radius:50%;background:#f1f1f5;font-size:20px}
+.cats{display:flex;gap:7px;overflow:auto;padding:10px 12px;border-bottom:1px solid var(--line)}.cat{padding:8px 12px;background:#f1f1f5;border-radius:999px;white-space:nowrap;font-weight:700;font-size:13px}.cat.active{background:#18181d;color:#fff}
+.items{padding:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:9px;overflow:auto}.item{min-height:84px;border:1px solid var(--line);border-radius:14px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px}.item .ico{font-size:30px}.item span:last-child{font-size:12px;font-weight:700;text-align:center}
+.props{position:fixed;right:16px;top:78px;width:225px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);z-index:25;padding:12px;display:none}.props.show{display:block}.props h3{margin:0 0 10px;font-size:15px}.row{display:flex;gap:7px;align-items:center;margin-top:8px}.row label{font-size:12px;color:var(--muted);width:48px}.row input{min-width:0;flex:1;padding:8px;border:1px solid var(--line);border-radius:9px}.smallbtn{flex:1;padding:9px 8px;border-radius:9px;background:#f1f1f5;font-weight:750;font-size:12px}.danger{color:var(--danger)}
+.toast{position:fixed;left:50%;top:78px;transform:translateX(-50%) translateY(-10px);padding:9px 14px;background:#18181d;color:#fff;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:.18s;z-index:80}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(max-width:760px){
+ header{height:56px;padding:0 9px}.brand{font-size:16px}.sidebar{display:none}.bottom{display:flex;gap:4px}.top-actions .optional{display:none}.status{top:9px;left:9px}.zoom{right:9px;bottom:9px}.items{grid-template-columns:repeat(3,1fr)}.props{top:auto;right:10px;left:10px;bottom:82px;width:auto}.floor-tab{padding:7px 10px}
+}
 </style>
 </head>
 <body>
 <div class="app">
-  <header>
-    <div class="brand">🏠 Floor Plan</div>
-    <div class="floor-tabs" id="floorTabs"></div>
-    <div class="top-actions">
-      <button class="icon-btn optional" id="undoBtn" title="復原">↶</button>
-      <button class="icon-btn optional" id="redoBtn" title="重做">↷</button>
-      <button class="icon-btn" id="addFloorBtn" title="新增樓層">＋F</button>
-      <button class="icon-btn" id="exportBtn" title="匯出圖片">⬇</button>
-    </div>
-  </header>
-
-  <div class="workspace">
-    <aside class="sidebar">
-      <button class="tool active" data-tool="select"><span class="emoji">👆</span>選取</button>
-      <button class="tool" data-tool="wall"><span class="emoji">🧱</span>牆</button>
-      <button class="tool" data-tool="pan"><span class="emoji">✋</span>移動畫布</button>
-      <button class="tool" id="deleteBtn"><span class="emoji">🗑️</span>刪除</button>
-      <button class="tool" id="clearBtn"><span class="emoji">🧹</span>清空</button>
-    </aside>
-
-    <main class="canvas-wrap" id="canvasWrap">
-      <canvas id="canvas"></canvas>
-      <div class="status" id="status">選取工具</div>
-      <div class="zoom">
-        <button id="zoomOut">−</button><span id="zoomLabel">100%</span><button id="zoomIn">＋</button>
-      </div>
-    </main>
+<header>
+  <div class="brand">🏠 Floor Plan</div>
+  <div class="floor-tabs" id="floorTabs"></div>
+  <div class="top-actions">
+    <button class="icon-btn optional" id="undoBtn" title="復原">↶</button>
+    <button class="icon-btn optional" id="redoBtn" title="重做">↷</button>
+    <button class="icon-btn" id="addFloorBtn" title="新增樓層">＋F</button>
+    <button class="icon-btn" id="exportBtn" title="匯出 PNG">⬇</button>
   </div>
+</header>
 
-  <nav class="bottom">
-    <button class="tool active" data-tool="select"><span class="emoji">👆</span>選取</button>
-    <button class="tool" data-tool="wall"><span class="emoji">🧱</span>畫牆</button>
-    <button class="tool" data-tool="pan"><span class="emoji">✋</span>移動</button>
-    <button class="tool" id="mobileUndo"><span class="emoji">↶</span>復原</button>
-    <button class="tool" id="mobileDelete"><span class="emoji">🗑️</span>刪除</button>
-  </nav>
+<div class="workspace">
+<aside class="sidebar">
+  <button class="tool active" data-tool="select"><span class="emoji">👆</span>選取</button>
+  <button class="tool" data-tool="wall"><span class="emoji">🧱</span>牆</button>
+  <button class="tool" data-tool="door"><span class="emoji">🚪</span>門</button>
+  <button class="tool" data-tool="window"><span class="emoji">🪟</span>窗</button>
+  <button class="tool" data-tool="library"><span class="emoji">🛋️</span>家具</button>
+  <button class="tool" data-tool="pan"><span class="emoji">✋</span>移動畫布</button>
+  <button class="tool" id="deleteBtn"><span class="emoji">🗑️</span>刪除</button>
+</aside>
+
+<main class="canvas-wrap" id="canvasWrap">
+  <canvas id="canvas"></canvas>
+  <div class="status" id="status">選取：點牆或家具後可拖曳</div>
+  <div class="zoom"><button id="zoomOut">−</button><span id="zoomLabel">100%</span><button id="zoomIn">＋</button></div>
+</main>
 </div>
 
-<div class="sheet" id="wallSheet">
-  <label>牆厚</label><input id="wallThickness" type="number" min="5" max="60" value="20">
-  <span>cm</span>
-  <button class="icon-btn primary" id="closeSheet">完成</button>
+<nav class="bottom">
+  <button class="tool active" data-tool="select"><span class="emoji">👆</span>選取</button>
+  <button class="tool" data-tool="wall"><span class="emoji">🧱</span>牆</button>
+  <button class="tool" data-tool="door"><span class="emoji">🚪</span>門</button>
+  <button class="tool" data-tool="window"><span class="emoji">🪟</span>窗</button>
+  <button class="tool" data-tool="library"><span class="emoji">🛋️</span>家具</button>
+</nav>
+</div>
+
+<div class="props" id="props">
+  <h3 id="propTitle">物件</h3>
+  <div class="row"><label>寬</label><input id="propW" type="number" min="20" step="10"><span>cm</span></div>
+  <div class="row"><label>深</label><input id="propH" type="number" min="20" step="10"><span>cm</span></div>
+  <div class="row"><button class="smallbtn" id="rotateLeft">↶ 旋轉</button><button class="smallbtn" id="rotateRight">↷ 旋轉</button></div>
+  <div class="row"><button class="smallbtn" id="duplicateBtn">⧉ 複製</button><button class="smallbtn danger" id="propDelete">🗑 刪除</button></div>
+</div>
+
+<div class="modal-backdrop" id="backdrop"></div>
+<div class="library" id="library">
+  <div class="lib-head"><strong>家具・設備</strong><button class="close" id="closeLibrary">×</button></div>
+  <div class="cats" id="cats"></div>
+  <div class="items" id="items"></div>
 </div>
 <div class="toast" id="toast"></div>
 
 <script>
-(() => {
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  const wrap = document.getElementById('canvasWrap');
-  const statusEl = document.getElementById('status');
-  const zoomLabel = document.getElementById('zoomLabel');
-  const floorTabs = document.getElementById('floorTabs');
-  const toastEl = document.getElementById('toast');
-  const thicknessInput = document.getElementById('wallThickness');
+(()=>{
+const $=id=>document.getElementById(id);
+const canvas=$('canvas'),ctx=canvas.getContext('2d'),wrap=$('canvasWrap');
+const STORAGE_KEY='floor-plan-app-v1',GRID_CM=20,BASE=.45;
+let dpr=1,tool='select',zoom=1,camera={x:80,y:80},drawing=null,panning=null,dragging=null,selected=null,placementType=null,history=[],future=[];
 
-  const STORAGE_KEY = 'floor-plan-app-v1';
-  const GRID_CM = 20;
-  const BASE_PX_PER_CM = 0.45;
-  let dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+const CATALOG={
+  '房間':[
+    ['bed','🛏️','床',180,200],['singlebed','🛏️','單人床',100,190],['wardrobe','🚪','衣櫃',120,60],
+    ['desk','🪑','書桌',120,60],['sofa','🛋️','沙發',180,85],['tv','📺','電視',120,35]
+  ],
+  '衛浴':[
+    ['toilet','🚽','馬桶',70,120],['sink','🚰','洗手台',70,55],['shower','🚿','淋浴區',90,90],
+    ['bathtub','🛁','浴缸',160,75],['washer','🧺','洗衣機',65,65]
+  ],
+  '廚房':[
+    ['fridge','🧊','冰箱',80,75],['cooktop','🔥','爐台',90,60],['kitchensink','🚰','廚房水槽',90,60],
+    ['counter','▤','流理台',180,60],['cabinet','▥','廚櫃',120,60],['island','▰','中島',160,80],
+    ['dining','🍽️','餐桌',140,80]
+  ],
+  '建築':[
+    ['stairs','🪜','樓梯',100,240],['column','▣','柱子',40,40],['altar','🛕','神明桌',110,80],
+    ['motorcycle','🏍️','摩托車',80,190]
+  ]
+};
 
-  let app = load() || {
-    version: 1,
-    floors: [{id: cryptoId(), name:'1F', walls:[]}],
-    activeFloorId: null
-  };
-  if (!app.activeFloorId) app.activeFloorId = app.floors[0].id;
+function id(){return crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now()}
+function normalize(data){
+  if(!data||!data.floors)return {version:2,floors:[{id:id(),name:'1F',walls:[],objects:[]}],activeFloorId:null};
+  data.version=2;
+  data.floors.forEach(f=>{f.walls=f.walls||[];f.objects=f.objects||[]});
+  return data;
+}
+let app=normalize(load()); if(!app.activeFloorId)app.activeFloorId=app.floors[0].id;
+function floor(){return app.floors.find(f=>f.id===app.activeFloorId)}
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(app))}
+function load(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))}catch(e){return null}}
+function snap(v){return Math.round(v/GRID_CM)*GRID_CM}
+function snapPoint(p){return{x:snap(p.x),y:snap(p.y)}}
+function snapshot(){history.push(JSON.stringify(app));if(history.length>80)history.shift();future=[]}
+function restore(s){app=normalize(JSON.parse(s));selected=null;renderFloors();save();draw();updateProps()}
+function undo(){if(!history.length)return toast('沒有可以復原的動作');future.push(JSON.stringify(app));restore(history.pop())}
+function redo(){if(!future.length)return toast('沒有可以重做的動作');history.push(JSON.stringify(app));restore(future.pop())}
 
-  let tool = 'select';
-  let zoom = 1;
-  let camera = {x: 80, y: 80};
-  let selectedId = null;
-  let drawing = null;
-  let dragging = null;
-  let panning = null;
-  let history = [];
-  let future = [];
+function resize(){
+ const r=wrap.getBoundingClientRect();dpr=Math.max(1,Math.min(2,devicePixelRatio||1));
+ canvas.width=Math.round(r.width*dpr);canvas.height=Math.round(r.height*dpr);
+ canvas.style.width=r.width+'px';canvas.style.height=r.height+'px';ctx.setTransform(dpr,0,0,dpr,0,0);draw()
+}
+addEventListener('resize',resize);
+function W2S(p){return{x:p.x*BASE*zoom+camera.x,y:p.y*BASE*zoom+camera.y}}
+function S2W(p){return{x:(p.x-camera.x)/(BASE*zoom),y:(p.y-camera.y)/(BASE*zoom)}}
+function pointer(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
 
-  function cryptoId(){
-    return (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2)+Date.now();
-  }
-  function floor(){ return app.floors.find(f=>f.id===app.activeFloorId); }
-  function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(app)); }
-  function load(){
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch(e){ return null; }
-  }
-  function snapshot(){
-    history.push(JSON.stringify(app));
-    if(history.length>80) history.shift();
-    future = [];
-  }
-  function restore(serialized){
-    app = JSON.parse(serialized);
-    selectedId = null; drawing = null; dragging = null;
-    renderFloorTabs(); save(); draw();
-  }
-  function undo(){
-    if(!history.length) return toast('沒有可以復原的動作');
-    future.push(JSON.stringify(app));
-    restore(history.pop());
-  }
-  function redo(){
-    if(!future.length) return toast('沒有可以重做的動作');
-    history.push(JSON.stringify(app));
-    restore(future.pop());
-  }
+function draw(){
+ const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);drawGrid(w,h);
+ floor().walls.forEach(x=>drawWall(x,selected?.kind==='wall'&&selected.id===x.id));
+ floor().objects.forEach(x=>drawObject(x,selected?.kind==='object'&&selected.id===x.id));
+ if(drawing)drawWall({...drawing,id:'preview'},false,true)
+}
+function drawGrid(w,h){
+ const s=GRID_CM*BASE*zoom;if(s<7)return;const ox=((camera.x%s)+s)%s,oy=((camera.y%s)+s)%s;
+ ctx.beginPath();for(let x=ox;x<w;x+=s){ctx.moveTo(x,0);ctx.lineTo(x,h)}for(let y=oy;y<h;y+=s){ctx.moveTo(0,y);ctx.lineTo(w,y)}
+ ctx.strokeStyle='#ececf1';ctx.lineWidth=1;ctx.stroke();
+ const m=s*5,mx=((camera.x%m)+m)%m,my=((camera.y%m)+m)%m;ctx.beginPath();for(let x=mx;x<w;x+=m){ctx.moveTo(x,0);ctx.lineTo(x,h)}for(let y=my;y<h;y+=m){ctx.moveTo(0,y);ctx.lineTo(w,y)}
+ ctx.strokeStyle='#dcdce4';ctx.stroke()
+}
+function drawWall(wall,sel=false,preview=false){
+ const a=W2S(wall.a),b=W2S(wall.b);ctx.save();ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineCap='square';ctx.lineWidth=Math.max(4,(wall.thickness||20)*BASE*zoom);ctx.strokeStyle=preview?'rgba(30,30,35,.42)':'#202024';ctx.stroke();
+ if(sel){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineWidth=Math.max(10,(wall.thickness||20)*BASE*zoom+9);ctx.strokeStyle='rgba(108,99,255,.25)';ctx.stroke()}
+ const len=Math.round(Math.hypot(wall.b.x-wall.a.x,wall.b.y-wall.a.y)),mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2},ang=Math.atan2(b.y-a.y,b.x-a.x);ctx.translate(mid.x,mid.y);ctx.rotate(ang);ctx.font='600 12px sans-serif';let t=len+' cm',tw=ctx.measureText(t).width;ctx.fillStyle='rgba(255,255,255,.9)';ctx.fillRect(-tw/2-4,-22,tw+8,16);ctx.fillStyle='#666674';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(t,0,-14);ctx.restore()
+}
+function drawObject(o,sel=false){
+ const c=W2S({x:o.x,y:o.y}),ww=o.w*BASE*zoom,hh=o.h*BASE*zoom;ctx.save();ctx.translate(c.x,c.y);ctx.rotate((o.rot||0)*Math.PI/180);
+ if(sel){ctx.strokeStyle='rgba(108,99,255,.7)';ctx.lineWidth=3;ctx.setLineDash([6,4]);ctx.strokeRect(-ww/2-5,-hh/2-5,ww+10,hh+10);ctx.setLineDash([])}
+ if(o.type==='door')drawDoor(o,ww,hh); else if(o.type==='window')drawWindow(o,ww,hh); else drawFurniture(o,ww,hh);
+ ctx.restore()
+}
+function box(ww,hh){ctx.fillStyle='#fafafa';ctx.strokeStyle='#33343a';ctx.lineWidth=2;ctx.fillRect(-ww/2,-hh/2,ww,hh);ctx.strokeRect(-ww/2,-hh/2,ww,hh)}
+function label(txt,ww,hh){ctx.fillStyle='#3d3d45';ctx.font=`600 ${Math.max(10,Math.min(14,ww/8))}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,0,Math.min(hh/2-9,hh*.28))}
+function drawDoor(o,ww,hh){
+ ctx.strokeStyle='#222';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-ww/2,0);ctx.lineTo(ww/2,0);ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(5,18*BASE*zoom);ctx.stroke();
+ ctx.strokeStyle='#222';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-ww/2,0);ctx.lineTo(-ww/2,-ww);ctx.stroke();ctx.beginPath();ctx.arc(-ww/2,0,ww,-Math.PI/2,0);ctx.stroke()
+}
+function drawWindow(o,ww,hh){
+ ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(5,18*BASE*zoom);ctx.beginPath();ctx.moveTo(-ww/2,0);ctx.lineTo(ww/2,0);ctx.stroke();
+ ctx.strokeStyle='#3487b7';ctx.lineWidth=2;[-2,2].forEach(d=>{ctx.beginPath();ctx.moveTo(-ww/2,d);ctx.lineTo(ww/2,d);ctx.stroke()})
+}
+function drawFurniture(o,ww,hh){
+ box(ww,hh);
+ switch(o.type){
+  case'bed':case'singlebed': ctx.strokeRect(-ww*.38,-hh*.38,ww*.76,hh*.24);ctx.beginPath();ctx.moveTo(-ww/2,-hh*.12);ctx.lineTo(ww/2,-hh*.12);ctx.stroke();label(o.label,ww,hh);break;
+  case'toilet': ctx.beginPath();ctx.ellipse(0,hh*.12,ww*.28,hh*.27,0,0,Math.PI*2);ctx.stroke();ctx.strokeRect(-ww*.28,-hh*.4,ww*.56,hh*.22);break;
+  case'sink':case'kitchensink': ctx.beginPath();ctx.ellipse(0,0,ww*.30,hh*.28,0,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(0,-hh*.20,4,0,Math.PI*2);ctx.stroke();break;
+  case'shower': ctx.beginPath();ctx.moveTo(-ww*.4,-hh*.4);ctx.lineTo(ww*.4,hh*.4);ctx.moveTo(ww*.4,-hh*.4);ctx.lineTo(-ww*.4,hh*.4);ctx.stroke();label('淋浴',ww,hh);break;
+  case'bathtub': ctx.beginPath();ctx.roundRect(-ww*.38,-hh*.32,ww*.76,hh*.64,Math.min(20,hh*.2));ctx.stroke();break;
+  case'fridge': ctx.beginPath();ctx.moveTo(-ww/2,0);ctx.lineTo(ww/2,0);ctx.stroke();ctx.beginPath();ctx.arc(ww*.30,-hh*.12,2,0,Math.PI*2);ctx.fill();label('冰箱',ww,hh);break;
+  case'cooktop': for(let x of[-.22,.22])for(let y of[-.18,.18]){ctx.beginPath();ctx.arc(ww*x,hh*y,Math.min(ww,hh)*.10,0,Math.PI*2);ctx.stroke()}break;
+  case'counter':case'cabinet': ctx.beginPath();for(let x=-ww*.3;x<=ww*.3;x+=ww*.3){ctx.moveTo(x,-hh/2);ctx.lineTo(x,hh/2)}ctx.stroke();label(o.label,ww,hh);break;
+  case'island': label('中島',ww,hh);break;
+  case'dining': ctx.strokeRect(-ww*.28,-hh*.25,ww*.56,hh*.5);for(let x of[-.38,.38])for(let y of[-.3,.3]){ctx.beginPath();ctx.arc(ww*x,hh*y,4,0,Math.PI*2);ctx.stroke()}break;
+  case'stairs': for(let y=-hh*.4;y<=hh*.4;y+=Math.max(7,hh/10)){ctx.beginPath();ctx.moveTo(-ww*.42,y);ctx.lineTo(ww*.42,y);ctx.stroke()}ctx.beginPath();ctx.moveTo(0,hh*.34);ctx.lineTo(0,-hh*.34);ctx.lineTo(-6,-hh*.25);ctx.moveTo(0,-hh*.34);ctx.lineTo(6,-hh*.25);ctx.stroke();break;
+  case'column': ctx.fillStyle='#777';ctx.fillRect(-ww/2,-hh/2,ww,hh);break;
+  case'altar': label('神明桌',ww,hh);break;
+  case'motorcycle': ctx.beginPath();ctx.arc(0,-hh*.28,ww*.23,0,Math.PI*2);ctx.arc(0,hh*.28,ww*.23,0,Math.PI*2);ctx.stroke();label('機車',ww,hh);break;
+  default: label(o.label||'家具',ww,hh)
+ }
+}
+function nearestWall(p,max=90){
+ let best=null,bd=Infinity,proj=null;
+ for(const w of floor().walls){
+  const ax=w.a.x,ay=w.a.y,bx=w.b.x,by=w.b.y,dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;if(!l2)continue;
+  let t=((p.x-ax)*dx+(p.y-ay)*dy)/l2;t=Math.max(0,Math.min(1,t));let q={x:ax+t*dx,y:ay+t*dy},d=Math.hypot(p.x-q.x,p.y-q.y);
+  if(d<bd){bd=d;best=w;proj=q}
+ }
+ return bd<=max?{wall:best,p:proj,angle:Math.atan2(best.b.y-best.a.y,best.b.x-best.a.x)*180/Math.PI}:null
+}
+function hit(p){
+ let best=null;
+ for(let i=floor().objects.length-1;i>=0;i--){let o=floor().objects[i],dx=p.x-o.x,dy=p.y-o.y,a=-(o.rot||0)*Math.PI/180,x=dx*Math.cos(a)-dy*Math.sin(a),y=dx*Math.sin(a)+dy*Math.cos(a);if(Math.abs(x)<=o.w/2+18&&Math.abs(y)<=o.h/2+18)return{kind:'object',id:o.id}}
+ let limit=28/(BASE*zoom),bd=Infinity;for(const w of floor().walls){let d=segDist(p,w.a,w.b);if(d<limit&&d<bd){bd=d;best={kind:'wall',id:w.id}}}return best
+}
+function segDist(p,a,b){let dx=b.x-a.x,dy=b.y-a.y;if(!dx&&!dy)return Math.hypot(p.x-a.x,p.y-a.y);let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy);t=Math.max(0,Math.min(1,t));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)}
+function getSelected(){if(!selected)return null;return selected.kind==='wall'?floor().walls.find(x=>x.id===selected.id):floor().objects.find(x=>x.id===selected.id)}
 
-  function resize(){
-    const r = wrap.getBoundingClientRect();
-    dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-    canvas.width = Math.round(r.width*dpr);
-    canvas.height = Math.round(r.height*dpr);
-    canvas.style.width = r.width+'px';
-    canvas.style.height = r.height+'px';
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-    draw();
-  }
-  window.addEventListener('resize', resize);
+function setTool(t){
+ if(t==='library'){openLibrary();return}
+ tool=t;placementType=null;selected=null;updateProps();
+ document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));
+ $('status').textContent=t==='wall'?'畫牆：拖曳起點到終點｜吸附 20 cm 格線':t==='door'?'門：點一下牆壁放置門':t==='window'?'窗：點一下牆壁放置窗':t==='pan'?'拖曳移動畫布':'選取：點牆或家具後可拖曳';
+ canvas.style.cursor=t==='wall'?'crosshair':t==='pan'?'grab':'default';draw()
+}
+document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
 
-  function worldToScreen(p){ return {x:p.x*BASE_PX_PER_CM*zoom+camera.x, y:p.y*BASE_PX_PER_CM*zoom+camera.y}; }
-  function screenToWorld(p){ return {x:(p.x-camera.x)/(BASE_PX_PER_CM*zoom), y:(p.y-camera.y)/(BASE_PX_PER_CM*zoom)}; }
-  function snap(v){ return Math.round(v/GRID_CM)*GRID_CM; }
-  function snapPoint(p){ return {x:snap(p.x), y:snap(p.y)}; }
+canvas.addEventListener('pointerdown',e=>{
+ canvas.setPointerCapture(e.pointerId);let s=pointer(e),raw=S2W(s),w=snapPoint(raw);
+ if(tool==='wall'){drawing={a:w,b:w,thickness:20};return draw()}
+ if(tool==='pan'){panning={sx:s.x,sy:s.y,cx:camera.x,cy:camera.y};return}
+ if(tool==='door'||tool==='window'){let n=nearestWall(raw);if(!n)return toast('請點在牆壁附近');snapshot();floor().objects.push({id:id(),type:tool,label:tool==='door'?'門':'窗',x:n.p.x,y:n.p.y,w:tool==='door'?90:120,h:20,rot:n.angle});save();draw();toast(tool==='door'?'門已放置':'窗已放置');return}
+ if(placementType){let def=findDef(placementType);snapshot();let p=snapPoint(raw);let o={id:id(),type:def[0],label:def[2],x:p.x,y:p.y,w:def[3],h:def[4],rot:0};floor().objects.push(o);save();selected={kind:'object',id:o.id};placementType=null;setTool('select');updateProps();draw();toast(def[2]+' 已放置');return}
+ if(tool==='select'){selected=hit(raw);updateProps();if(selected){let obj=getSelected();dragging={start:raw,orig:JSON.parse(JSON.stringify(obj)),kind:selected.kind,moved:false}}draw()}
+});
+canvas.addEventListener('pointermove',e=>{
+ let s=pointer(e),raw=S2W(s);
+ if(drawing){let end=snapPoint(raw),dx=Math.abs(end.x-drawing.a.x),dy=Math.abs(end.y-drawing.a.y);if(dx<40)end.x=drawing.a.x;if(dy<40)end.y=drawing.a.y;drawing.b=end;return draw()}
+ if(panning){camera.x=panning.cx+s.x-panning.sx;camera.y=panning.cy+s.y-panning.sy;return draw()}
+ if(dragging){let obj=getSelected();if(!obj)return;if(dragging.kind==='object'){let p=snapPoint({x:dragging.orig.x+raw.x-dragging.start.x,y:dragging.orig.y+raw.y-dragging.start.y});obj.x=p.x;obj.y=p.y}else{let dx=snap(raw.x-dragging.start.x),dy=snap(raw.y-dragging.start.y);obj.a={x:dragging.orig.a.x+dx,y:dragging.orig.a.y+dy};obj.b={x:dragging.orig.b.x+dx,y:dragging.orig.b.y+dy}}dragging.moved=true;draw()}
+});
+canvas.addEventListener('pointerup',()=>{
+ if(drawing){let len=Math.hypot(drawing.b.x-drawing.a.x,drawing.b.y-drawing.a.y);if(len>=GRID_CM){snapshot();floor().walls.push({id:id(),...drawing});save();toast('牆已建立')}drawing=null;draw()}
+ if(dragging){if(dragging.moved){let cur=JSON.parse(JSON.stringify(app)),f=cur.floors.find(x=>x.id===cur.activeFloorId);if(dragging.kind==='object'){let x=f.objects.find(x=>x.id===selected.id);Object.assign(x,dragging.orig)}else{let x=f.walls.find(x=>x.id===selected.id);Object.assign(x,dragging.orig)}history.push(JSON.stringify(cur));future=[];save()}dragging=null}
+ panning=null
+});
+canvas.addEventListener('wheel',e=>{e.preventDefault();let s=pointer(e),before=S2W(s);zoom=Math.max(.35,Math.min(3,zoom*(e.deltaY<0?1.1:.9)));let after=W2S(before);camera.x+=s.x-after.x;camera.y+=s.y-after.y;updateZoom();draw()},{passive:false});
 
-  function pointerPos(e){
-    const r = canvas.getBoundingClientRect();
-    return {x:e.clientX-r.left,y:e.clientY-r.top};
-  }
+function deleteSelected(){if(!selected)return toast('請先選擇物件');snapshot();if(selected.kind==='wall')floor().walls=floor().walls.filter(x=>x.id!==selected.id);else floor().objects=floor().objects.filter(x=>x.id!==selected.id);selected=null;updateProps();save();draw();toast('已刪除')}
+$('deleteBtn').onclick=deleteSelected;$('propDelete').onclick=deleteSelected;$('undoBtn').onclick=undo;$('redoBtn').onclick=redo;
+$('zoomIn').onclick=()=>{zoom=Math.min(3,zoom*1.2);updateZoom();draw()};$('zoomOut').onclick=()=>{zoom=Math.max(.35,zoom/1.2);updateZoom();draw()};
+function updateZoom(){$('zoomLabel').textContent=Math.round(zoom*100)+'%'}
 
-  function draw(){
-    const w=canvas.clientWidth,h=canvas.clientHeight;
-    ctx.clearRect(0,0,w,h);
-    ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
-    drawGrid(w,h);
-    floor().walls.forEach(wall=>drawWall(wall, wall.id===selectedId));
-    if(drawing) drawWall({...drawing,id:'preview'}, false, true);
-  }
+function renderFloors(){$('floorTabs').innerHTML='';app.floors.forEach(f=>{let b=document.createElement('button');b.className='floor-tab'+(f.id===app.activeFloorId?' active':'');b.textContent=f.name;b.onclick=()=>{app.activeFloorId=f.id;selected=null;save();renderFloors();updateProps();draw()};$('floorTabs').appendChild(b)})}
+$('addFloorBtn').onclick=()=>{snapshot();let n=app.floors.length+1,f={id:id(),name:n+'F',walls:[],objects:[]};app.floors.push(f);app.activeFloorId=f.id;save();renderFloors();draw();toast('已新增 '+f.name)};
+$('exportBtn').onclick=()=>{let old=selected;selected=null;draw();let a=document.createElement('a');a.download='FloorPlan-'+floor().name+'.png';a.href=canvas.toDataURL('image/png',1);a.click();selected=old;draw()};
 
-  function drawGrid(w,h){
-    const step=GRID_CM*BASE_PX_PER_CM*zoom;
-    if(step<7) return;
-    const ox=((camera.x%step)+step)%step, oy=((camera.y%step)+step)%step;
-    ctx.beginPath();
-    for(let x=ox;x<w;x+=step){ctx.moveTo(x,0);ctx.lineTo(x,h);}
-    for(let y=oy;y<h;y+=step){ctx.moveTo(0,y);ctx.lineTo(w,y);}
-    ctx.strokeStyle=step>=16?'#e8e8ee':'#f0f0f4'; ctx.lineWidth=1; ctx.stroke();
+function updateProps(){
+ let box=$('props'),o=getSelected();if(!o||selected.kind!=='object'){box.classList.remove('show');return}
+ box.classList.add('show');$('propTitle').textContent=o.label||'物件';$('propW').value=Math.round(o.w);$('propH').value=Math.round(o.h)
+}
+function changeSize(){let o=getSelected();if(!o||selected.kind!=='object')return;snapshot();o.w=Math.max(20,+$('propW').value||o.w);o.h=Math.max(20,+$('propH').value||o.h);save();draw()}
+$('propW').onchange=changeSize;$('propH').onchange=changeSize;
+function rotate(d){let o=getSelected();if(!o||selected.kind!=='object')return;snapshot();o.rot=((o.rot||0)+d+360)%360;save();draw()}
+$('rotateLeft').onclick=()=>rotate(-90);$('rotateRight').onclick=()=>rotate(90);
+$('duplicateBtn').onclick=()=>{let o=getSelected();if(!o||selected.kind!=='object')return;snapshot();let c={...o,id:id(),x:o.x+40,y:o.y+40};floor().objects.push(c);selected={kind:'object',id:c.id};save();updateProps();draw();toast('已複製')};
 
-    const major=step*5;
-    const mx=((camera.x%major)+major)%major, my=((camera.y%major)+major)%major;
-    ctx.beginPath();
-    for(let x=mx;x<w;x+=major){ctx.moveTo(x,0);ctx.lineTo(x,h);}
-    for(let y=my;y<h;y+=major){ctx.moveTo(0,y);ctx.lineTo(w,y);}
-    ctx.strokeStyle='#d9d9e1';ctx.stroke();
-  }
+function renderLibrary(cat=Object.keys(CATALOG)[0]){
+ $('cats').innerHTML='';Object.keys(CATALOG).forEach(c=>{let b=document.createElement('button');b.className='cat'+(c===cat?' active':'');b.textContent=c;b.onclick=()=>renderLibrary(c);$('cats').appendChild(b)});
+ $('items').innerHTML='';CATALOG[cat].forEach(def=>{let b=document.createElement('button');b.className='item';b.innerHTML=`<span class="ico">${def[1]}</span><span>${def[2]}</span>`;b.onclick=()=>{placementType=def[0];closeLibrary();tool='select';selected=null;document.querySelectorAll('[data-tool]').forEach(x=>x.classList.remove('active'));$('status').textContent='點畫布放置：'+def[2];canvas.style.cursor='crosshair'};$('items').appendChild(b)})
+}
+function findDef(type){for(const arr of Object.values(CATALOG))for(const d of arr)if(d[0]===type)return d}
+function openLibrary(){$('backdrop').classList.add('show');$('library').classList.add('show');renderLibrary()}
+function closeLibrary(){$('backdrop').classList.remove('show');$('library').classList.remove('show')}
+$('closeLibrary').onclick=closeLibrary;$('backdrop').onclick=closeLibrary;
 
-  function drawWall(wall, selected=false, preview=false){
-    const a=worldToScreen(wall.a), b=worldToScreen(wall.b);
-    ctx.save();
-    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
-    ctx.lineCap='square';
-    ctx.lineWidth=Math.max(4, wall.thickness*BASE_PX_PER_CM*zoom);
-    ctx.strokeStyle=preview?'rgba(23,23,27,.45)':'#202024';
-    ctx.stroke();
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}if((e.key==='Delete'||e.key==='Backspace')&&selected){e.preventDefault();deleteSelected()}if(e.key==='Escape'){drawing=null;selected=null;placementType=null;updateProps();draw()}});
+function toast(m){$('toast').textContent=m;$('toast').classList.add('show');clearTimeout($('toast')._t);$('toast')._t=setTimeout(()=>$('toast').classList.remove('show'),1500)}
 
-    if(selected){
-      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
-      ctx.lineWidth=Math.max(8, wall.thickness*BASE_PX_PER_CM*zoom+8);
-      ctx.strokeStyle='rgba(108,99,255,.28)';ctx.stroke();
-
-      [a,b].forEach(p=>{
-        ctx.beginPath();ctx.arc(p.x,p.y,7,0,Math.PI*2);
-        ctx.fillStyle='#6c63ff';ctx.fill();
-        ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.stroke();
-      });
-    }
-
-    const len=Math.round(Math.hypot(wall.b.x-wall.a.x, wall.b.y-wall.a.y));
-    const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
-    const angle=Math.atan2(b.y-a.y,b.x-a.x);
-    ctx.translate(mid.x,mid.y);
-    ctx.rotate(angle);
-    ctx.font='600 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-    const text=len+' cm';
-    const tw=ctx.measureText(text).width;
-    ctx.fillStyle='rgba(255,255,255,.92)';
-    ctx.fillRect(-tw/2-5,-23,tw+10,17);
-    ctx.fillStyle='#595966';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(text,0,-15);
-    ctx.restore();
-  }
-
-  function setTool(next){
-    tool=next;
-    document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===next));
-    statusEl.textContent =
-      next==='wall' ? '畫牆：拖曳起點到終點｜自動吸附 20 cm 格線' :
-      next==='pan' ? '移動畫布' : '選取：點牆可移動或刪除';
-    canvas.style.cursor=next==='wall'?'crosshair':next==='pan'?'grab':'default';
-    selectedId=null; draw();
-  }
-
-  document.querySelectorAll('[data-tool]').forEach(btn=>btn.addEventListener('click',()=>setTool(btn.dataset.tool)));
-
-  function distanceToSegment(p,a,b){
-    const dx=b.x-a.x,dy=b.y-a.y;
-    if(dx===0&&dy===0)return Math.hypot(p.x-a.x,p.y-a.y);
-    let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy);
-    t=Math.max(0,Math.min(1,t));
-    return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy));
-  }
-  function hitWall(world){
-    const threshold=26/(BASE_PX_PER_CM*zoom);
-    let best=null,bestD=Infinity;
-    for(const wall of floor().walls){
-      const d=distanceToSegment(world,wall.a,wall.b);
-      if(d<threshold&&d<bestD){best=wall;bestD=d;}
-    }
-    return best;
-  }
-
-  canvas.addEventListener('pointerdown', e=>{
-    canvas.setPointerCapture(e.pointerId);
-    const s=pointerPos(e), raw=screenToWorld(s), w=snapPoint(raw);
-
-    if(tool==='wall'){
-      drawing={a:w,b:w,thickness:Math.max(5,Number(thicknessInput.value)||20)};
-      draw(); return;
-    }
-    if(tool==='pan'){
-      panning={sx:s.x,sy:s.y,cx:camera.x,cy:camera.y};
-      canvas.style.cursor='grabbing'; return;
-    }
-    if(tool==='select'){
-      const hit=hitWall(raw);
-      selectedId=hit?hit.id:null;
-      if(hit){
-        dragging={id:hit.id,start:raw,origA:{...hit.a},origB:{...hit.b},moved:false};
-      }
-      draw();
-    }
-  });
-
-  canvas.addEventListener('pointermove', e=>{
-    const s=pointerPos(e), raw=screenToWorld(s);
-    if(drawing){
-      let end=snapPoint(raw);
-      const dx=Math.abs(end.x-drawing.a.x),dy=Math.abs(end.y-drawing.a.y);
-      if(dx<40) end.x=drawing.a.x;
-      if(dy<40) end.y=drawing.a.y;
-      drawing.b=end; draw(); return;
-    }
-    if(panning){
-      camera.x=panning.cx+(s.x-panning.sx);
-      camera.y=panning.cy+(s.y-panning.sy);
-      draw(); return;
-    }
-    if(dragging){
-      const wall=floor().walls.find(x=>x.id===dragging.id);
-      if(!wall)return;
-      const dx=snap(raw.x-dragging.start.x),dy=snap(raw.y-dragging.start.y);
-      if(dx||dy) dragging.moved=true;
-      wall.a={x:dragging.origA.x+dx,y:dragging.origA.y+dy};
-      wall.b={x:dragging.origB.x+dx,y:dragging.origB.y+dy};
-      draw();
-    }
-  });
-
-  canvas.addEventListener('pointerup', e=>{
-    if(drawing){
-      const len=Math.hypot(drawing.b.x-drawing.a.x,drawing.b.y-drawing.a.y);
-      if(len>=GRID_CM){
-        snapshot();
-        floor().walls.push({id:cryptoId(),...drawing});
-        save(); toast('牆已建立');
-      }
-      drawing=null; draw();
-    }
-    if(dragging){
-      if(dragging.moved){ snapshotBeforeDrag(dragging); save(); }
-      dragging=null;
-    }
-    if(panning){panning=null;canvas.style.cursor=tool==='pan'?'grab':'default';}
-  });
-
-  function snapshotBeforeDrag(d){
-    const current=JSON.parse(JSON.stringify(app));
-    const w=current.floors.find(f=>f.id===current.activeFloorId).walls.find(x=>x.id===d.id);
-    if(w){w.a=d.origA;w.b=d.origB;}
-    history.push(JSON.stringify(current));
-    if(history.length>80) history.shift();
-    future=[];
-  }
-
-  canvas.addEventListener('wheel', e=>{
-    e.preventDefault();
-    const s=pointerPos(e), before=screenToWorld(s);
-    zoom=Math.max(.35,Math.min(3,zoom*(e.deltaY<0?1.1:.9)));
-    const afterScreen=worldToScreen(before);
-    camera.x += s.x-afterScreen.x; camera.y += s.y-afterScreen.y;
-    updateZoom(); draw();
-  },{passive:false});
-
-  function deleteSelected(){
-    if(!selectedId) return toast('請先選一面牆');
-    snapshot();
-    floor().walls=floor().walls.filter(w=>w.id!==selectedId);
-    selectedId=null;save();draw();toast('已刪除');
-  }
-  document.getElementById('deleteBtn').onclick=deleteSelected;
-  document.getElementById('mobileDelete').onclick=deleteSelected;
-
-  document.getElementById('clearBtn').onclick=()=>{
-    if(!floor().walls.length)return;
-    if(confirm('確定要清空目前樓層的所有牆嗎？')){
-      snapshot();floor().walls=[];selectedId=null;save();draw();toast('已清空');
-    }
-  };
-
-  document.getElementById('undoBtn').onclick=undo;
-  document.getElementById('mobileUndo').onclick=undo;
-  document.getElementById('redoBtn').onclick=redo;
-
-  document.getElementById('zoomIn').onclick=()=>{zoom=Math.min(3,zoom*1.2);updateZoom();draw();}
-  document.getElementById('zoomOut').onclick=()=>{zoom=Math.max(.35,zoom/1.2);updateZoom();draw();}
-  function updateZoom(){zoomLabel.textContent=Math.round(zoom*100)+'%';}
-
-  function renderFloorTabs(){
-    floorTabs.innerHTML='';
-    app.floors.forEach(f=>{
-      const b=document.createElement('button');
-      b.className='floor-tab'+(f.id===app.activeFloorId?' active':'');
-      b.textContent=f.name;
-      b.onclick=()=>{app.activeFloorId=f.id;selectedId=null;save();renderFloorTabs();draw();}
-      floorTabs.appendChild(b);
-    });
-  }
-
-  document.getElementById('addFloorBtn').onclick=()=>{
-    snapshot();
-    const n=app.floors.length+1;
-    const f={id:cryptoId(),name:n+'F',walls:[]};
-    app.floors.push(f);app.activeFloorId=f.id;save();renderFloorTabs();draw();toast('已新增 '+f.name);
-  };
-
-  document.getElementById('exportBtn').onclick=()=>{
-    const oldSelected=selectedId; selectedId=null; draw();
-    const link=document.createElement('a');
-    link.download=`FloorPlan-${floor().name}.png`;
-    link.href=canvas.toDataURL('image/png',1);
-    link.click();
-    selectedId=oldSelected;draw();
-  };
-
-  document.addEventListener('keydown',e=>{
-    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}
-    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo();}
-    if(e.key==='Delete'||e.key==='Backspace'){ if(selectedId){e.preventDefault();deleteSelected();} }
-    if(e.key==='Escape'){drawing=null;dragging=null;selectedId=null;draw();}
-  });
-
-  function toast(msg){
-    toastEl.textContent=msg;toastEl.classList.add('show');
-    clearTimeout(toastEl._t);toastEl._t=setTimeout(()=>toastEl.classList.remove('show'),1500);
-  }
-
-  renderFloorTabs();
-  resize();
-  updateZoom();
+renderFloors();resize();updateZoom();save();
 })();
 </script>
 </body>
