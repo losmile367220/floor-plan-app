@@ -59,6 +59,9 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
     <button class="icon-btn optional" id="redoBtn" title="重做">↷</button>
     <button class="icon-btn" id="addFloorBtn" title="新增樓層">＋F</button>
     <button class="icon-btn" id="groupModeBtn" title="多選並鎖在一起">🔗</button>
+    <button class="icon-btn" id="selectAllBtn" title="全選目前樓層">☑️</button>
+    <button class="icon-btn" id="copyFloorBtn" title="複製目前樓層全部物件">📋</button>
+    <button class="icon-btn" id="pasteFloorBtn" title="貼到目前樓層">📥</button>
     <button class="icon-btn" id="snapBtn" title="物件吸附格線：關">🧲</button>
     <button class="icon-btn" id="saveBtn" title="儲存進度">💾</button>
     <button class="icon-btn" id="backupBtn" title="JSON 備份 / 還原">📦</button>
@@ -160,7 +163,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
 const $=id=>document.getElementById(id);
 const canvas=$('canvas'),ctx=canvas.getContext('2d'),wrap=$('canvasWrap');
 const STORAGE_KEY='floor-plan-app-v1',GRID_CM=20,BASE=.45;
-let dpr=1,tool='select',zoom=1,camera={x:80,y:80},drawing=null,panning=null,dragging=null,resizing=null,wallResizing=null,rotating=null,selected=null,placementType=null,history=[],future=[],objectSnap=false,multiSelectMode=false,multiSelected=new Set(),hoverTarget=null;
+let dpr=1,tool='select',zoom=1,camera={x:80,y:80},drawing=null,panning=null,dragging=null,resizing=null,wallResizing=null,rotating=null,selected=null,placementType=null,history=[],future=[],objectSnap=false,multiSelectMode=false,multiSelected=new Set(),hoverTarget=null,selectAllMode=false,floorClipboard=null;
 
 const CATALOG={
   '房間':[
@@ -201,7 +204,7 @@ function loadView(){
 }
 function switchFloor(fid){
  if(fid===app.activeFloorId)return;
- storeView();app.activeFloorId=fid;selected=null;drawing=null;dragging=null;resizing=null;wallResizing=null;rotating=null;
+ storeView();app.activeFloorId=fid;selected=null;selectAllMode=false;drawing=null;dragging=null;resizing=null;wallResizing=null;rotating=null;
  loadView();save();renderFloors();updateProps();draw()
 }
 function save(){storeView();localStorage.setItem(STORAGE_KEY,JSON.stringify(app))}
@@ -267,11 +270,11 @@ function pointer(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.
 
 function draw(){
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);drawGrid(w,h);
- floor().walls.forEach(x=>drawWall(x,selected?.kind==='wall'&&selected.id===x.id));
+ floor().walls.forEach(x=>drawWall(x,selectAllMode||(selected?.kind==='wall'&&selected.id===x.id)));
  const activeObj=selected?.kind==='object'?floor().objects.find(o=>o.id===selected.id):null;
  floor().objects.forEach(x=>{
    const sameGroup=!!(activeObj?.groupId && x.groupId===activeObj.groupId);
-   drawObject(x,(selected?.kind==='object'&&selected.id===x.id)||sameGroup||multiSelected.has(x.id))
+   drawObject(x,selectAllMode||(selected?.kind==='object'&&selected.id===x.id)||sameGroup||multiSelected.has(x.id))
  });
  if(drawing)drawWall({...drawing,id:'preview'},false,true)
 }
@@ -682,6 +685,57 @@ function exitGroupMode(){
  updateGroupBar();$('status').textContent='選取：直接按住物件中間拖曳即可移動；方形控制點縮放，上方圓點旋轉';draw()
 }
 
+function cloneWithNewIds(items){
+ const idMap=new Map();
+ items.forEach(x=>idMap.set(x.id,id()));
+ return items.map(x=>{
+   const c=JSON.parse(JSON.stringify(x));
+   c.id=idMap.get(x.id);
+   if(c.groupId){
+     if(!idMap.has('group:'+c.groupId))idMap.set('group:'+c.groupId,id());
+     c.groupId=idMap.get('group:'+c.groupId);
+   }
+   return c
+ })
+}
+function selectAllCurrentFloor(){
+ selectAllMode=true;selected=null;multiSelected.clear();updateProps();draw();
+ $('status').textContent='已全選目前樓層，可直接複製'
+ toast('已全選 '+(floor().walls.length+floor().objects.length)+' 個項目')
+}
+function clearSelectAll(){
+ selectAllMode=false;draw()
+}
+function copyCurrentFloor(){
+ floorClipboard={
+   sourceFloorId:floor().id,
+   walls:JSON.parse(JSON.stringify(floor().walls)),
+   objects:JSON.parse(JSON.stringify(floor().objects))
+ };
+ toast('已複製目前樓層全部內容')
+}
+function pasteToCurrentFloor(){
+ if(!floorClipboard)return toast('剪貼簿目前沒有樓層內容');
+ if(!floorClipboard.walls.length&&!floorClipboard.objects.length)return toast('沒有可以貼上的內容');
+ snapshot();
+
+ const wallCopies=cloneWithNewIds(floorClipboard.walls);
+ const objCopies=cloneWithNewIds(floorClipboard.objects);
+
+ // Slight offset when pasting onto same floor, exact position on other floors.
+ const sameFloor=floorClipboard.sourceFloorId===floor().id;
+ const offset=sameFloor?40:0;
+ wallCopies.forEach(w=>{
+   w.a.x+=offset;w.a.y+=offset;w.b.x+=offset;w.b.y+=offset;
+ });
+ objCopies.forEach(o=>{o.x+=offset;o.y+=offset});
+
+ floor().walls.push(...wallCopies);
+ floor().objects.push(...objCopies);
+ selectAllMode=false;selected=null;save();draw();
+ toast('已貼到 '+floor().name)
+}
+
 
 function setTool(t){
  if(multiSelectMode)exitGroupMode();
@@ -691,7 +745,7 @@ function setTool(t){
  if(t==='more'){openCustom('shape');return}
  tool=t;placementType=null;selected=null;updateProps();
  document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));
- $('status').textContent=t==='wall'?'畫牆：拖曳起點到終點｜吸附 20 cm 格線':t==='door'?'門：可放任意位置；靠近牆時會自動貼齊':t==='window'?'窗：可放任意位置；靠近牆時會自動貼齊':t==='pan'?'拖曳移動畫布':'選取：直接按住物件中間拖曳即可移動；方形控制點縮放，上方圓點旋轉';
+ $('status').textContent=t==='wall'?'畫牆：拖曳起點到終點｜吸附 20 cm 格線':t==='door'?'門：可放任意位置；靠近牆時會自動貼齊':t==='window'?'窗：可放任意位置；靠近牆時會自動貼齊':t==='pan'?'拖曳移動畫布':'選取：可直接拖移物件；☑️全選後可📋複製，切樓層後📥貼上';
  canvas.style.cursor=t==='wall'?'crosshair':t==='pan'?'grab':'default';draw()
 }
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
@@ -930,6 +984,16 @@ $('ungroupBtn').onclick=()=>{
 };
 
 
+
+$('selectAllBtn').onclick=()=>{
+ if(selectAllMode){clearSelectAll();toast('已取消全選')}else selectAllCurrentFloor()
+};
+$('copyFloorBtn').onclick=()=>{
+ if(!selectAllMode)selectAllCurrentFloor();
+ copyCurrentFloor();
+};
+$('pasteFloorBtn').onclick=pasteToCurrentFloor;
+
 $('backupBtn').onclick=()=>{$('backupPanel').classList.toggle('show')};
 $('closeBackup').onclick=()=>{$('backupPanel').classList.remove('show')};
 $('exportJsonBtn').onclick=downloadJsonBackup;
@@ -1035,7 +1099,14 @@ function addCustomText(vertical){
 }
 $('addTextH').onclick=()=>addCustomText(false);$('addTextV').onclick=()=>addCustomText(true);
 
-document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}if((e.key==='Delete'||e.key==='Backspace')&&selected){e.preventDefault();deleteSelected()}if(e.key==='Escape'){
+document.addEventListener('keydown',e=>{
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='a'){e.preventDefault();selectAllCurrentFloor();return}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='c'&&selectAllMode){e.preventDefault();copyCurrentFloor();return}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='v'&&floorClipboard){e.preventDefault();pasteToCurrentFloor();return}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}
+ if((e.key==='Delete'||e.key==='Backspace')&&selected){e.preventDefault();deleteSelected()}
+ if(e.key==='Escape'){
    if(multiSelectMode){exitGroupMode();return}
    drawing=null;dragging=null;resizing=null;wallResizing=null;rotating=null;selected=null;placementType=null;updateProps();draw()
  }});
