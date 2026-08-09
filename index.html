@@ -20,6 +20,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
 .floor-tab.active{background:#18181d;color:#fff}
 .group-bar{position:fixed;left:50%;top:72px;transform:translateX(-50%);z-index:88;display:none;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:8px 10px}
 .group-bar.show{display:flex}.group-bar strong{font-size:13px;white-space:nowrap}
+.cloud-panel{position:fixed;left:50%;top:78px;transform:translateX(-50%) translateY(-8px);z-index:94;display:none;width:min(440px,calc(100% - 24px));background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}.cloud-panel.show{display:block;transform:translateX(-50%) translateY(0)}
 .backup-panel{position:fixed;left:50%;top:78px;transform:translateX(-50%) translateY(-8px);z-index:92;display:none;width:min(420px,calc(100% - 24px));background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
 .backup-panel.show{display:block;transform:translateX(-50%) translateY(0)}
 .floor-menu{position:fixed;z-index:90;display:none;min-width:170px;padding:7px;background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow)}
@@ -48,6 +49,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
  header{height:56px;padding:0 9px}.brand{font-size:16px}.sidebar{display:none}.bottom{display:flex;gap:4px}.top-actions .optional{display:none}.status{top:9px;left:9px}.zoom{right:9px;bottom:9px}.items{grid-template-columns:repeat(3,1fr)}.props{top:auto;right:10px;left:10px;bottom:82px;width:auto}.floor-tab{padding:7px 10px}
 }
 </style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <div class="app">
@@ -65,6 +67,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
     <button class="icon-btn" id="snapBtn" title="物件吸附格線：關">🧲</button>
     <button class="icon-btn" id="saveBtn" title="儲存進度">💾</button>
     <button class="icon-btn" id="backupBtn" title="JSON 備份 / 還原">📦</button>
+    <button class="icon-btn" id="cloudBtn" title="Google Drive 雲端">☁️</button>
     <button class="icon-btn" id="exportBtn" title="匯出 PNG">⬇</button>
   </div>
 </header>
@@ -136,6 +139,32 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
   <button class="smallbtn primary" id="makeGroupBtn">🔗 鎖一起</button>
   <button class="smallbtn" id="cancelGroupBtn">取消</button>
 </div>
+
+<div class="cloud-panel" id="cloudPanel">
+  <div class="lib-head">
+    <strong>☁️ Google Drive 雲端</strong>
+    <button class="close" id="closeCloud">×</button>
+  </div>
+  <div style="padding:14px;display:grid;gap:10px">
+    <div id="cloudStatus" style="font-size:13px;color:var(--muted);line-height:1.55">尚未登入 Google</div>
+    <div id="googleSignInWrap"><div id="googleSignInButton"></div></div>
+    <div id="cloudClientSetup" style="display:none">
+      <label style="font-size:12px;color:var(--muted)">Google OAuth Web Client ID</label>
+      <input id="cloudClientIdInput" placeholder="xxxxxxxx.apps.googleusercontent.com"
+             style="width:100%;margin-top:6px;padding:10px;border:1px solid var(--line);border-radius:10px">
+      <button class="smallbtn primary" id="saveCloudClientId" style="margin-top:8px">儲存 Client ID</button>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5">只需設定一次，會存在這台裝置的瀏覽器。</div>
+    </div>
+    <div id="cloudActions" style="display:none;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="smallbtn primary" id="cloudSaveBtn">☁️ 儲存到雲端</button>
+      <button class="smallbtn" id="cloudLoadBtn">⬇ 從雲端載入</button>
+    </div>
+    <div id="cloudSyncInfo" style="font-size:12px;color:var(--muted)">最後同步：尚未同步</div>
+    <button class="smallbtn" id="cloudLogoutBtn" style="display:none">登出 Google</button>
+    <div style="font-size:11px;color:var(--muted);line-height:1.5">本機自動儲存仍會保留；雲端用於跨裝置同步與備份。</div>
+  </div>
+</div>
+
 <div class="backup-panel" id="backupPanel">
   <div class="lib-head">
     <strong>📦 專案備份 / 還原</strong>
@@ -163,6 +192,9 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
 const $=id=>document.getElementById(id);
 const canvas=$('canvas'),ctx=canvas.getContext('2d'),wrap=$('canvasWrap');
 const STORAGE_KEY='floor-plan-app-v1',GRID_CM=20,BASE=.45;
+const CLOUD_GAS_URL='https://script.google.com/macros/s/AKfycbxZ18TnRfJuGkMkMVX7Qepj3_Z9Jd3PbhY8QiBecGZ3PIcaRwowi8b7T7PWvMQEA5-2/exec';
+const CLOUD_CLIENT_ID_KEY='floor-plan-google-client-id';
+let googleIdToken='',googleProfile=null,googleCredentialExpiresAt=0;
 let dpr=1,tool='select',zoom=1,camera={x:80,y:80},drawing=null,panning=null,dragging=null,resizing=null,wallResizing=null,rotating=null,selected=null,placementType=null,history=[],future=[],objectSnap=false,multiSelectMode=false,multiSelected=new Set(),hoverTarget=null,selectAllMode=false,floorClipboard=null;
 
 const CATALOG={
@@ -209,6 +241,85 @@ function switchFloor(fid){
 }
 function save(){storeView();localStorage.setItem(STORAGE_KEY,JSON.stringify(app))}
 function load(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))}catch(e){return null}}
+
+function getCloudClientId(){return String(localStorage.getItem(CLOUD_CLIENT_ID_KEY)||'').trim()}
+function setCloudClientId(v){v=String(v||'').trim();if(v)localStorage.setItem(CLOUD_CLIENT_ID_KEY,v);else localStorage.removeItem(CLOUD_CLIENT_ID_KEY)}
+function parseJwtPayload(token){
+ try{
+  let part=token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+  while(part.length%4)part+='=';
+  return JSON.parse(decodeURIComponent(atob(part).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join('')))
+ }catch(e){return null}
+}
+function cloudTokenValid(){return !!googleIdToken&&Date.now()<googleCredentialExpiresAt-30000}
+function updateCloudUI(){
+ const clientId=getCloudClientId(),setup=$('cloudClientSetup'),signWrap=$('googleSignInWrap'),actions=$('cloudActions'),logout=$('cloudLogoutBtn'),status=$('cloudStatus');
+ setup.style.display=clientId?'none':'block';
+ signWrap.style.display=clientId&&!cloudTokenValid()?'block':'none';
+ actions.style.display=cloudTokenValid()?'grid':'none';
+ logout.style.display=cloudTokenValid()?'block':'none';
+ status.textContent=!clientId?'尚未設定 Google Web Client ID':cloudTokenValid()?'已登入：'+(googleProfile?.email||'Google 帳號'):'Client ID 已設定，請登入 Google'
+}
+function initGoogleSignIn(){
+ const clientId=getCloudClientId();
+ if(!clientId){updateCloudUI();return}
+ if(!(window.google&&google.accounts&&google.accounts.id)){setTimeout(initGoogleSignIn,350);return}
+ const btn=$('googleSignInButton');btn.innerHTML='';
+ google.accounts.id.initialize({client_id:clientId,callback:handleGoogleCredential,auto_select:false,cancel_on_tap_outside:true});
+ google.accounts.id.renderButton(btn,{theme:'outline',size:'large',type:'standard',shape:'rectangular',text:'signin_with',width:300});
+ updateCloudUI()
+}
+function handleGoogleCredential(response){
+ googleIdToken=String(response?.credential||'');
+ const payload=parseJwtPayload(googleIdToken);googleProfile=payload||null;
+ googleCredentialExpiresAt=payload?.exp?payload.exp*1000:Date.now()+50*60*1000;
+ updateCloudUI();toast('Google 登入成功')
+}
+async function cloudPost(action,data){
+ if(!cloudTokenValid()){googleIdToken='';googleProfile=null;googleCredentialExpiresAt=0;updateCloudUI();throw new Error('Google 登入已過期，請重新登入。')}
+ const body={action,idToken:googleIdToken};if(data!==undefined)body.data=data;
+ const res=await fetch(CLOUD_GAS_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)});
+ const text=await res.text();let out;
+ try{out=JSON.parse(text)}catch(e){throw new Error('雲端回傳格式錯誤')}
+ if(!out?.ok)throw new Error(out?.error||'雲端操作失敗');
+ return out
+}
+function formatCloudTime(v){
+ if(!v)return'尚未同步';
+ try{return new Intl.DateTimeFormat('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(v))}
+ catch(e){return String(v)}
+}
+async function saveProjectToCloud(){
+ try{
+  storeView();save();$('cloudSaveBtn').disabled=true;$('cloudSaveBtn').textContent='☁️ 儲存中...';
+  const out=await cloudPost('saveProject',app);
+  const t=out.savedAt||new Date().toISOString();localStorage.setItem('floor-plan-last-cloud-sync',t);
+  $('cloudSyncInfo').textContent='最後同步：'+formatCloudTime(t);toast('已儲存到 Google Drive')
+ }catch(err){alert('雲端儲存失敗：'+(err?.message||err))}
+ finally{$('cloudSaveBtn').disabled=false;$('cloudSaveBtn').textContent='☁️ 儲存到雲端'}
+}
+async function loadProjectFromCloud(){
+ try{
+  $('cloudLoadBtn').disabled=true;$('cloudLoadBtn').textContent='載入中...';
+  const out=await cloudPost('loadProject');
+  if(!out.exists){alert('Google Drive 目前還沒有 Floor Plan 雲端專案。\n\n請先用「儲存到雲端」把目前本機格局上傳。');return}
+  const savedAt=formatCloudTime(out.savedAt);
+  if(!confirm('要用 Google Drive 的專案取代目前本機內容嗎？\n\n雲端最後儲存：'+savedAt+'\n\n目前本機資料會先自動保留一份備援。'))return;
+  localStorage.setItem(STORAGE_KEY+'-before-cloud-load-'+Date.now(),JSON.stringify(app));
+  app=normalize(out.project);
+  if(!app.activeFloorId||!app.floors.some(f=>f.id===app.activeFloorId))app.activeFloorId=app.floors[0].id;
+  selected=null;selectAllMode=false;drawing=null;dragging=null;resizing=null;wallResizing=null;rotating=null;
+  loadView();renderFloors();updateProps();save();draw();
+  const t=out.savedAt||new Date().toISOString();localStorage.setItem('floor-plan-last-cloud-sync',t);
+  $('cloudSyncInfo').textContent='最後同步：'+formatCloudTime(t);toast('已從 Google Drive 載入')
+ }catch(err){alert('雲端載入失敗：'+(err?.message||err))}
+ finally{$('cloudLoadBtn').disabled=false;$('cloudLoadBtn').textContent='⬇ 從雲端載入'}
+}
+function logoutGoogle(){
+ try{if(window.google&&google.accounts&&google.accounts.id)google.accounts.id.disableAutoSelect()}catch(e){}
+ googleIdToken='';googleProfile=null;googleCredentialExpiresAt=0;updateCloudUI();toast('已登出 Google')
+}
+
 function projectBackupObject(){
  storeView();
  return {
@@ -994,6 +1105,22 @@ $('copyFloorBtn').onclick=()=>{
 };
 $('pasteFloorBtn').onclick=pasteToCurrentFloor;
 
+
+$('cloudBtn').onclick=()=>{
+ $('backupPanel').classList.remove('show');$('cloudPanel').classList.toggle('show');
+ const last=localStorage.getItem('floor-plan-last-cloud-sync');$('cloudSyncInfo').textContent='最後同步：'+formatCloudTime(last);
+ updateCloudUI();if(getCloudClientId()&&!cloudTokenValid())initGoogleSignIn()
+};
+$('closeCloud').onclick=()=>$('cloudPanel').classList.remove('show');
+$('saveCloudClientId').onclick=()=>{
+ const v=$('cloudClientIdInput').value.trim();
+ if(!v.endsWith('.apps.googleusercontent.com'))return alert('Client ID 看起來不完整，請貼上整串 xxxx.apps.googleusercontent.com');
+ setCloudClientId(v);$('cloudClientIdInput').value='';updateCloudUI();initGoogleSignIn();toast('Client ID 已儲存')
+};
+$('cloudSaveBtn').onclick=saveProjectToCloud;
+$('cloudLoadBtn').onclick=loadProjectFromCloud;
+$('cloudLogoutBtn').onclick=logoutGoogle;
+
 $('backupBtn').onclick=()=>{$('backupPanel').classList.toggle('show')};
 $('closeBackup').onclick=()=>{$('backupPanel').classList.remove('show')};
 $('exportJsonBtn').onclick=downloadJsonBackup;
@@ -1113,6 +1240,7 @@ document.addEventListener('keydown',e=>{
 function toast(m){$('toast').textContent=m;$('toast').classList.add('show');clearTimeout($('toast')._t);$('toast')._t=setTimeout(()=>$('toast').classList.remove('show'),1500)}
 
 loadView();renderFloors();resize();updateZoom();save();
+const lastCloudSync=localStorage.getItem('floor-plan-last-cloud-sync');if(lastCloudSync)$('cloudSyncInfo').textContent='最後同步：'+formatCloudTime(lastCloudSync);updateCloudUI();if(getCloudClientId())initGoogleSignIn();
 })();
 </script>
 </body>
