@@ -123,7 +123,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
 const $=id=>document.getElementById(id);
 const canvas=$('canvas'),ctx=canvas.getContext('2d'),wrap=$('canvasWrap');
 const STORAGE_KEY='floor-plan-app-v1',GRID_CM=20,BASE=.45;
-let dpr=1,tool='select',zoom=1,camera={x:80,y:80},drawing=null,panning=null,dragging=null,resizing=null,selected=null,placementType=null,history=[],future=[];
+let dpr=1,tool='select',zoom=1,camera={x:80,y:80},drawing=null,panning=null,dragging=null,resizing=null,wallResizing=null,rotating=null,selected=null,placementType=null,history=[],future=[];
 
 const CATALOG={
   '房間':[
@@ -188,7 +188,15 @@ function drawGrid(w,h){
 }
 function drawWall(wall,sel=false,preview=false){
  const a=W2S(wall.a),b=W2S(wall.b);ctx.save();ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineCap='square';ctx.lineWidth=Math.max(4,(wall.thickness||20)*BASE*zoom);ctx.strokeStyle=preview?'rgba(30,30,35,.42)':'#202024';ctx.stroke();
- if(sel){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineWidth=Math.max(10,(wall.thickness||20)*BASE*zoom+9);ctx.strokeStyle='rgba(108,99,255,.25)';ctx.stroke()}
+ if(sel){
+   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+   ctx.lineWidth=Math.max(10,(wall.thickness||20)*BASE*zoom+9);
+   ctx.strokeStyle='rgba(108,99,255,.25)';ctx.stroke();
+   [a,b].forEach(p=>{
+     ctx.beginPath();ctx.arc(p.x,p.y,8,0,Math.PI*2);
+     ctx.fillStyle='#fff';ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='#6c63ff';ctx.stroke();
+   });
+ }
  const len=Math.round(Math.hypot(wall.b.x-wall.a.x,wall.b.y-wall.a.y)),mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2},ang=Math.atan2(b.y-a.y,b.x-a.x);ctx.translate(mid.x,mid.y);ctx.rotate(ang);ctx.font='600 12px sans-serif';let t=len+' cm',tw=ctx.measureText(t).width;ctx.fillStyle='rgba(255,255,255,.9)';ctx.fillRect(-tw/2-4,-22,tw+8,16);ctx.fillStyle='#666674';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(t,0,-14);ctx.restore()
 }
 function drawObject(o,sel=false){
@@ -201,6 +209,9 @@ function drawObject(o,sel=false){
      ctx.fillStyle='#fff';ctx.strokeStyle='#6c63ff';ctx.lineWidth=2;
      handles.forEach(p=>{ctx.beginPath();ctx.rect(p[0]-hs/2,p[1]-hs/2,hs,hs);ctx.fill();ctx.stroke()});
    }
+   const rotY=-hh/2-32;
+   ctx.beginPath();ctx.moveTo(0,-hh/2-5);ctx.lineTo(0,rotY+8);ctx.strokeStyle='#6c63ff';ctx.lineWidth=2;ctx.stroke();
+   ctx.beginPath();ctx.arc(0,rotY,8,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='#6c63ff';ctx.stroke();
  }
  if(o.type==='door')drawDoor(o,ww,hh);
  else if(o.type==='window')drawWindow(o,ww,hh);
@@ -341,6 +352,19 @@ function objectLocalPoint(o,p){
  const dx=p.x-o.x,dy=p.y-o.y,a=-(o.rot||0)*Math.PI/180;
  return{x:dx*Math.cos(a)-dy*Math.sin(a),y:dx*Math.sin(a)+dy*Math.cos(a)}
 }
+function hitWallEndpoint(w,p){
+ const tol=20/(BASE*zoom);
+ if(Math.hypot(p.x-w.a.x,p.y-w.a.y)<=tol)return'a';
+ if(Math.hypot(p.x-w.b.x,p.y-w.b.y)<=tol)return'b';
+ return null;
+}
+function hitRotationHandle(o,p){
+ if(!o)return false;
+ const q=objectLocalPoint(o,p);
+ const rotY=-o.h/2-(32/(BASE*zoom));
+ const tol=18/(BASE*zoom);
+ return Math.hypot(q.x,q.y-rotY)<=tol;
+}
 function hitResizeHandle(o,p){
  if(!o||o.type==='door'||o.type==='window')return null;
  const q=objectLocalPoint(o,p), tol=18/(BASE*zoom);
@@ -366,7 +390,7 @@ function setTool(t){
  if(t==='more'){openCustom('shape');return}
  tool=t;placementType=null;selected=null;updateProps();
  document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));
- $('status').textContent=t==='wall'?'畫牆：拖曳起點到終點｜吸附 20 cm 格線':t==='door'?'門：點一下牆壁放置門':t==='window'?'窗：點一下牆壁放置窗':t==='pan'?'拖曳移動畫布':'選取：點物件後可移動；拖控制點可拉大拉小';
+ $('status').textContent=t==='wall'?'畫牆：拖曳起點到終點｜吸附 20 cm 格線':t==='door'?'門：點一下牆壁放置門':t==='window'?'窗：點一下牆壁放置窗':t==='pan'?'拖曳移動畫布':'選取：牆端點可拉直/拉橫；物件控制點可縮放，上方圓點可自由旋轉';
  canvas.style.cursor=t==='wall'?'crosshair':t==='pan'?'grab':'default';draw()
 }
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
@@ -390,8 +414,22 @@ canvas.addEventListener('pointerdown',e=>{
  floor().objects.push(o);save();selected={kind:'object',id:o.id};placementType=null;setTool('select');updateProps();draw();toast(label+' 已放置');return
 }
  if(tool==='select'){
+   if(selected?.kind==='wall'){
+     let existing=getSelected(),end=hitWallEndpoint(existing,raw);
+     if(end){
+       wallResizing={end,orig:JSON.parse(JSON.stringify(existing)),id:existing.id,moved:false};
+       return;
+     }
+   }
    if(selected?.kind==='object'){
-     let existing=getSelected(),handle=hitResizeHandle(existing,raw);
+     let existing=getSelected();
+     if(hitRotationHandle(existing,raw)){
+       const center={x:existing.x,y:existing.y};
+       const startAngle=Math.atan2(raw.y-center.y,raw.x-center.x)*180/Math.PI;
+       rotating={id:existing.id,orig:JSON.parse(JSON.stringify(existing)),startAngle,origRot:existing.rot||0,moved:false};
+       return;
+     }
+     let handle=hitResizeHandle(existing,raw);
      if(handle){
        resizing={handle,start:raw,orig:JSON.parse(JSON.stringify(existing)),id:existing.id,moved:false};
        return;
@@ -406,6 +444,25 @@ canvas.addEventListener('pointermove',e=>{
  let s=pointer(e),raw=S2W(s);
  if(drawing){let end=snapPoint(raw),dx=Math.abs(end.x-drawing.a.x),dy=Math.abs(end.y-drawing.a.y);if(dx<40)end.x=drawing.a.x;if(dy<40)end.y=drawing.a.y;drawing.b=end;return draw()}
  if(panning){camera.x=panning.cx+s.x-panning.sx;camera.y=panning.cy+s.y-panning.sy;return draw()}
+ if(wallResizing){
+   let w=floor().walls.find(x=>x.id===wallResizing.id);if(!w)return;
+   let p=snapPoint(raw);
+   const other=wallResizing.end==='a'?w.b:w.a;
+   const dx=Math.abs(p.x-other.x),dy=Math.abs(p.y-other.y);
+   if(dx<40)p.x=other.x;
+   if(dy<40)p.y=other.y;
+   w[wallResizing.end]=p;
+   wallResizing.moved=true;draw();return
+ }
+ if(rotating){
+   let o=floor().objects.find(x=>x.id===rotating.id);if(!o)return;
+   const angle=Math.atan2(raw.y-o.y,raw.x-o.x)*180/Math.PI;
+   let next=rotating.origRot+(angle-rotating.startAngle);
+   // Light 5-degree snapping, but still feels free
+   next=Math.round(next/5)*5;
+   o.rot=((next%360)+360)%360;
+   rotating.moved=true;draw();return
+ }
  if(resizing){
    let o=floor().objects.find(x=>x.id===resizing.id);if(!o)return;
    let orig=resizing.orig,q=objectLocalPoint(orig,raw),min=20;
@@ -428,6 +485,22 @@ canvas.addEventListener('pointermove',e=>{
 });
 canvas.addEventListener('pointerup',()=>{
  if(drawing){let len=Math.hypot(drawing.b.x-drawing.a.x,drawing.b.y-drawing.a.y);if(len>=GRID_CM){snapshot();floor().walls.push({id:id(),...drawing});save();toast('牆已建立')}drawing=null;draw()}
+ if(wallResizing){
+   if(wallResizing.moved){
+     let cur=JSON.parse(JSON.stringify(app)),f=cur.floors.find(x=>x.id===cur.activeFloorId),x=f.walls.find(x=>x.id===wallResizing.id);
+     if(x)Object.assign(x,wallResizing.orig);
+     history.push(JSON.stringify(cur));if(history.length>80)history.shift();future=[];save()
+   }
+   wallResizing=null
+ }
+ if(rotating){
+   if(rotating.moved){
+     let cur=JSON.parse(JSON.stringify(app)),f=cur.floors.find(x=>x.id===cur.activeFloorId),x=f.objects.find(x=>x.id===rotating.id);
+     if(x)Object.assign(x,rotating.orig);
+     history.push(JSON.stringify(cur));if(history.length>80)history.shift();future=[];save()
+   }
+   rotating=null;updateProps()
+ }
  if(resizing){
    if(resizing.moved){
      let cur=JSON.parse(JSON.stringify(app)),f=cur.floors.find(x=>x.id===cur.activeFloorId),x=f.objects.find(x=>x.id===resizing.id);
@@ -535,7 +608,7 @@ function addCustomText(vertical){
 }
 $('addTextH').onclick=()=>addCustomText(false);$('addTextV').onclick=()=>addCustomText(true);
 
-document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}if((e.key==='Delete'||e.key==='Backspace')&&selected){e.preventDefault();deleteSelected()}if(e.key==='Escape'){drawing=null;selected=null;placementType=null;updateProps();draw()}});
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}if((e.key==='Delete'||e.key==='Backspace')&&selected){e.preventDefault();deleteSelected()}if(e.key==='Escape'){drawing=null;dragging=null;resizing=null;wallResizing=null;rotating=null;selected=null;placementType=null;updateProps();draw()}});
 function toast(m){$('toast').textContent=m;$('toast').classList.add('show');clearTimeout($('toast')._t);$('toast')._t=setTimeout(()=>$('toast').classList.remove('show'),1500)}
 
 renderFloors();resize();updateZoom();save();
