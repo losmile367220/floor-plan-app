@@ -1,1 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#f7f7fb" />
+<title>Floor Plan</title>
+<style>
+  :root{
+    --bg:#f7f7fb; --panel:#ffffff; --text:#17171b; --muted:#777783;
+    --line:#d9d9e2; --accent:#6c63ff; --danger:#d94b4b;
+    --shadow:0 8px 24px rgba(0,0,0,.08);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;background:var(--bg);color:var(--text)}
+  button,input{font:inherit}
+  button{border:0;background:none;color:inherit;cursor:pointer}
+  .app{height:100dvh;display:flex;flex-direction:column}
+  header{
+    height:64px;display:flex;align-items:center;gap:12px;padding:0 16px;
+    background:rgba(255,255,255,.95);border-bottom:1px solid var(--line);z-index:10
+  }
+  .brand{font-weight:800;font-size:20px;white-space:nowrap}
+  .floor-tabs{display:flex;gap:6px;overflow:auto;flex:1}
+  .floor-tab{
+    padding:8px 12px;border-radius:10px;background:#f0f0f5;font-weight:700;white-space:nowrap
+  }
+  .floor-tab.active{background:#17171b;color:#fff}
+  .top-actions{display:flex;gap:6px}
+  .icon-btn,.tool{
+    min-width:42px;height:42px;border-radius:12px;background:#f1f1f6;
+    display:flex;align-items:center;justify-content:center;font-weight:700
+  }
+  .workspace{flex:1;min-height:0;display:flex}
+  .sidebar{
+    width:92px;padding:12px 10px;background:#fff;border-right:1px solid var(--line);
+    display:flex;flex-direction:column;gap:8px;z-index:8
+  }
+  .tool{height:58px;flex-direction:column;gap:2px;font-size:12px}
+  .tool .emoji{font-size:20px}
+  .tool.active{background:#17171b;color:#fff}
+  .canvas-wrap{position:relative;flex:1;overflow:hidden;background:#ececf2;touch-action:none}
+  canvas{display:block;width:100%;height:100%;background:#fff;touch-action:none}
+  .status{
+    position:absolute;left:14px;top:14px;background:rgba(255,255,255,.94);
+    box-shadow:var(--shadow);padding:8px 11px;border-radius:10px;font-size:12px;color:var(--muted);pointer-events:none
+  }
+  .zoom{
+    position:absolute;right:14px;bottom:14px;background:#fff;box-shadow:var(--shadow);
+    border-radius:14px;padding:6px;display:flex;align-items:center;gap:4px
+  }
+  .zoom button{width:40px;height:40px;border-radius:10px;background:#f1f1f6;font-weight:800;font-size:18px}
+  .zoom span{min-width:52px;text-align:center;font-size:12px;color:var(--muted)}
+  .bottom{
+    display:none;height:70px;background:#fff;border-top:1px solid var(--line);
+    padding:8px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
+    z-index:10
+  }
+  .bottom .tool{flex:1;height:54px}
+  .sheet{
+    position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
+    background:#fff;border:1px solid var(--line);box-shadow:var(--shadow);border-radius:16px;
+    padding:12px;display:none;gap:8px;z-index:30;align-items:center
+  }
+  .sheet.show{display:flex}
+  .sheet label{font-size:13px;color:var(--muted)}
+  .sheet input{width:90px;padding:9px;border:1px solid var(--line);border-radius:9px}
+  .primary{background:#17171b!important;color:#fff!important}
+  .danger{color:var(--danger)}
+  .toast{
+    position:fixed;left:50%;top:82px;transform:translateX(-50%) translateY(-10px);
+    padding:9px 14px;background:#17171b;color:#fff;border-radius:999px;font-size:13px;
+    opacity:0;pointer-events:none;transition:.18s;z-index:50
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  @media(max-width:760px){
+    header{height:56px;padding:0 10px}
+    .brand{font-size:17px}
+    .sidebar{display:none}
+    .bottom{display:flex;gap:6px}
+    .top-actions .optional{display:none}
+    .status{top:10px;left:10px}
+    .zoom{right:10px;bottom:10px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">🏠 Floor Plan</div>
+    <div class="floor-tabs" id="floorTabs"></div>
+    <div class="top-actions">
+      <button class="icon-btn optional" id="undoBtn" title="復原">↶</button>
+      <button class="icon-btn optional" id="redoBtn" title="重做">↷</button>
+      <button class="icon-btn" id="addFloorBtn" title="新增樓層">＋F</button>
+      <button class="icon-btn" id="exportBtn" title="匯出圖片">⬇</button>
+    </div>
+  </header>
 
+  <div class="workspace">
+    <aside class="sidebar">
+      <button class="tool active" data-tool="select"><span class="emoji">👆</span>選取</button>
+      <button class="tool" data-tool="wall"><span class="emoji">🧱</span>牆</button>
+      <button class="tool" data-tool="pan"><span class="emoji">✋</span>移動畫布</button>
+      <button class="tool" id="deleteBtn"><span class="emoji">🗑️</span>刪除</button>
+      <button class="tool" id="clearBtn"><span class="emoji">🧹</span>清空</button>
+    </aside>
+
+    <main class="canvas-wrap" id="canvasWrap">
+      <canvas id="canvas"></canvas>
+      <div class="status" id="status">選取工具</div>
+      <div class="zoom">
+        <button id="zoomOut">−</button><span id="zoomLabel">100%</span><button id="zoomIn">＋</button>
+      </div>
+    </main>
+  </div>
+
+  <nav class="bottom">
+    <button class="tool active" data-tool="select"><span class="emoji">👆</span>選取</button>
+    <button class="tool" data-tool="wall"><span class="emoji">🧱</span>畫牆</button>
+    <button class="tool" data-tool="pan"><span class="emoji">✋</span>移動</button>
+    <button class="tool" id="mobileUndo"><span class="emoji">↶</span>復原</button>
+    <button class="tool" id="mobileDelete"><span class="emoji">🗑️</span>刪除</button>
+  </nav>
+</div>
+
+<div class="sheet" id="wallSheet">
+  <label>牆厚</label><input id="wallThickness" type="number" min="5" max="60" value="20">
+  <span>cm</span>
+  <button class="icon-btn primary" id="closeSheet">完成</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('canvasWrap');
+  const statusEl = document.getElementById('status');
+  const zoomLabel = document.getElementById('zoomLabel');
+  const floorTabs = document.getElementById('floorTabs');
+  const toastEl = document.getElementById('toast');
+  const thicknessInput = document.getElementById('wallThickness');
+
+  const STORAGE_KEY = 'floor-plan-app-v1';
+  const GRID_CM = 20;
+  const BASE_PX_PER_CM = 0.45;
+  let dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+
+  let app = load() || {
+    version: 1,
+    floors: [{id: cryptoId(), name:'1F', walls:[]}],
+    activeFloorId: null
+  };
+  if (!app.activeFloorId) app.activeFloorId = app.floors[0].id;
+
+  let tool = 'select';
+  let zoom = 1;
+  let camera = {x: 80, y: 80};
+  let selectedId = null;
+  let drawing = null;
+  let dragging = null;
+  let panning = null;
+  let history = [];
+  let future = [];
+
+  function cryptoId(){
+    return (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2)+Date.now();
+  }
+  function floor(){ return app.floors.find(f=>f.id===app.activeFloorId); }
+  function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(app)); }
+  function load(){
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch(e){ return null; }
+  }
+  function snapshot(){
+    history.push(JSON.stringify(app));
+    if(history.length>80) history.shift();
+    future = [];
+  }
+  function restore(serialized){
+    app = JSON.parse(serialized);
+    selectedId = null; drawing = null; dragging = null;
+    renderFloorTabs(); save(); draw();
+  }
+  function undo(){
+    if(!history.length) return toast('沒有可以復原的動作');
+    future.push(JSON.stringify(app));
+    restore(history.pop());
+  }
+  function redo(){
+    if(!future.length) return toast('沒有可以重做的動作');
+    history.push(JSON.stringify(app));
+    restore(future.pop());
+  }
+
+  function resize(){
+    const r = wrap.getBoundingClientRect();
+    dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    canvas.width = Math.round(r.width*dpr);
+    canvas.height = Math.round(r.height*dpr);
+    canvas.style.width = r.width+'px';
+    canvas.style.height = r.height+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    draw();
+  }
+  window.addEventListener('resize', resize);
+
+  function worldToScreen(p){ return {x:p.x*BASE_PX_PER_CM*zoom+camera.x, y:p.y*BASE_PX_PER_CM*zoom+camera.y}; }
+  function screenToWorld(p){ return {x:(p.x-camera.x)/(BASE_PX_PER_CM*zoom), y:(p.y-camera.y)/(BASE_PX_PER_CM*zoom)}; }
+  function snap(v){ return Math.round(v/GRID_CM)*GRID_CM; }
+  function snapPoint(p){ return {x:snap(p.x), y:snap(p.y)}; }
+
+  function pointerPos(e){
+    const r = canvas.getBoundingClientRect();
+    return {x:e.clientX-r.left,y:e.clientY-r.top};
+  }
+
+  function draw(){
+    const w=canvas.clientWidth,h=canvas.clientHeight;
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+    drawGrid(w,h);
+    floor().walls.forEach(wall=>drawWall(wall, wall.id===selectedId));
+    if(drawing) drawWall({...drawing,id:'preview'}, false, true);
+  }
+
+  function drawGrid(w,h){
+    const step=GRID_CM*BASE_PX_PER_CM*zoom;
+    if(step<7) return;
+    const ox=((camera.x%step)+step)%step, oy=((camera.y%step)+step)%step;
+    ctx.beginPath();
+    for(let x=ox;x<w;x+=step){ctx.moveTo(x,0);ctx.lineTo(x,h);}
+    for(let y=oy;y<h;y+=step){ctx.moveTo(0,y);ctx.lineTo(w,y);}
+    ctx.strokeStyle=step>=16?'#e8e8ee':'#f0f0f4'; ctx.lineWidth=1; ctx.stroke();
+
+    const major=step*5;
+    const mx=((camera.x%major)+major)%major, my=((camera.y%major)+major)%major;
+    ctx.beginPath();
+    for(let x=mx;x<w;x+=major){ctx.moveTo(x,0);ctx.lineTo(x,h);}
+    for(let y=my;y<h;y+=major){ctx.moveTo(0,y);ctx.lineTo(w,y);}
+    ctx.strokeStyle='#d9d9e1';ctx.stroke();
+  }
+
+  function drawWall(wall, selected=false, preview=false){
+    const a=worldToScreen(wall.a), b=worldToScreen(wall.b);
+    ctx.save();
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+    ctx.lineCap='square';
+    ctx.lineWidth=Math.max(4, wall.thickness*BASE_PX_PER_CM*zoom);
+    ctx.strokeStyle=preview?'rgba(23,23,27,.45)':'#202024';
+    ctx.stroke();
+
+    if(selected){
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+      ctx.lineWidth=Math.max(8, wall.thickness*BASE_PX_PER_CM*zoom+8);
+      ctx.strokeStyle='rgba(108,99,255,.28)';ctx.stroke();
+
+      [a,b].forEach(p=>{
+        ctx.beginPath();ctx.arc(p.x,p.y,7,0,Math.PI*2);
+        ctx.fillStyle='#6c63ff';ctx.fill();
+        ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.stroke();
+      });
+    }
+
+    const len=Math.round(Math.hypot(wall.b.x-wall.a.x, wall.b.y-wall.a.y));
+    const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+    const angle=Math.atan2(b.y-a.y,b.x-a.x);
+    ctx.translate(mid.x,mid.y);
+    ctx.rotate(angle);
+    ctx.font='600 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    const text=len+' cm';
+    const tw=ctx.measureText(text).width;
+    ctx.fillStyle='rgba(255,255,255,.92)';
+    ctx.fillRect(-tw/2-5,-23,tw+10,17);
+    ctx.fillStyle='#595966';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(text,0,-15);
+    ctx.restore();
+  }
+
+  function setTool(next){
+    tool=next;
+    document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===next));
+    statusEl.textContent =
+      next==='wall' ? '畫牆：拖曳起點到終點｜自動吸附 20 cm 格線' :
+      next==='pan' ? '移動畫布' : '選取：點牆可移動或刪除';
+    canvas.style.cursor=next==='wall'?'crosshair':next==='pan'?'grab':'default';
+    selectedId=null; draw();
+  }
+
+  document.querySelectorAll('[data-tool]').forEach(btn=>btn.addEventListener('click',()=>setTool(btn.dataset.tool)));
+
+  function distanceToSegment(p,a,b){
+    const dx=b.x-a.x,dy=b.y-a.y;
+    if(dx===0&&dy===0)return Math.hypot(p.x-a.x,p.y-a.y);
+    let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy);
+    t=Math.max(0,Math.min(1,t));
+    return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy));
+  }
+  function hitWall(world){
+    const threshold=26/(BASE_PX_PER_CM*zoom);
+    let best=null,bestD=Infinity;
+    for(const wall of floor().walls){
+      const d=distanceToSegment(world,wall.a,wall.b);
+      if(d<threshold&&d<bestD){best=wall;bestD=d;}
+    }
+    return best;
+  }
+
+  canvas.addEventListener('pointerdown', e=>{
+    canvas.setPointerCapture(e.pointerId);
+    const s=pointerPos(e), raw=screenToWorld(s), w=snapPoint(raw);
+
+    if(tool==='wall'){
+      drawing={a:w,b:w,thickness:Math.max(5,Number(thicknessInput.value)||20)};
+      draw(); return;
+    }
+    if(tool==='pan'){
+      panning={sx:s.x,sy:s.y,cx:camera.x,cy:camera.y};
+      canvas.style.cursor='grabbing'; return;
+    }
+    if(tool==='select'){
+      const hit=hitWall(raw);
+      selectedId=hit?hit.id:null;
+      if(hit){
+        dragging={id:hit.id,start:raw,origA:{...hit.a},origB:{...hit.b},moved:false};
+      }
+      draw();
+    }
+  });
+
+  canvas.addEventListener('pointermove', e=>{
+    const s=pointerPos(e), raw=screenToWorld(s);
+    if(drawing){
+      let end=snapPoint(raw);
+      const dx=Math.abs(end.x-drawing.a.x),dy=Math.abs(end.y-drawing.a.y);
+      if(dx<40) end.x=drawing.a.x;
+      if(dy<40) end.y=drawing.a.y;
+      drawing.b=end; draw(); return;
+    }
+    if(panning){
+      camera.x=panning.cx+(s.x-panning.sx);
+      camera.y=panning.cy+(s.y-panning.sy);
+      draw(); return;
+    }
+    if(dragging){
+      const wall=floor().walls.find(x=>x.id===dragging.id);
+      if(!wall)return;
+      const dx=snap(raw.x-dragging.start.x),dy=snap(raw.y-dragging.start.y);
+      if(dx||dy) dragging.moved=true;
+      wall.a={x:dragging.origA.x+dx,y:dragging.origA.y+dy};
+      wall.b={x:dragging.origB.x+dx,y:dragging.origB.y+dy};
+      draw();
+    }
+  });
+
+  canvas.addEventListener('pointerup', e=>{
+    if(drawing){
+      const len=Math.hypot(drawing.b.x-drawing.a.x,drawing.b.y-drawing.a.y);
+      if(len>=GRID_CM){
+        snapshot();
+        floor().walls.push({id:cryptoId(),...drawing});
+        save(); toast('牆已建立');
+      }
+      drawing=null; draw();
+    }
+    if(dragging){
+      if(dragging.moved){ snapshotBeforeDrag(dragging); save(); }
+      dragging=null;
+    }
+    if(panning){panning=null;canvas.style.cursor=tool==='pan'?'grab':'default';}
+  });
+
+  function snapshotBeforeDrag(d){
+    const current=JSON.parse(JSON.stringify(app));
+    const w=current.floors.find(f=>f.id===current.activeFloorId).walls.find(x=>x.id===d.id);
+    if(w){w.a=d.origA;w.b=d.origB;}
+    history.push(JSON.stringify(current));
+    if(history.length>80) history.shift();
+    future=[];
+  }
+
+  canvas.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const s=pointerPos(e), before=screenToWorld(s);
+    zoom=Math.max(.35,Math.min(3,zoom*(e.deltaY<0?1.1:.9)));
+    const afterScreen=worldToScreen(before);
+    camera.x += s.x-afterScreen.x; camera.y += s.y-afterScreen.y;
+    updateZoom(); draw();
+  },{passive:false});
+
+  function deleteSelected(){
+    if(!selectedId) return toast('請先選一面牆');
+    snapshot();
+    floor().walls=floor().walls.filter(w=>w.id!==selectedId);
+    selectedId=null;save();draw();toast('已刪除');
+  }
+  document.getElementById('deleteBtn').onclick=deleteSelected;
+  document.getElementById('mobileDelete').onclick=deleteSelected;
+
+  document.getElementById('clearBtn').onclick=()=>{
+    if(!floor().walls.length)return;
+    if(confirm('確定要清空目前樓層的所有牆嗎？')){
+      snapshot();floor().walls=[];selectedId=null;save();draw();toast('已清空');
+    }
+  };
+
+  document.getElementById('undoBtn').onclick=undo;
+  document.getElementById('mobileUndo').onclick=undo;
+  document.getElementById('redoBtn').onclick=redo;
+
+  document.getElementById('zoomIn').onclick=()=>{zoom=Math.min(3,zoom*1.2);updateZoom();draw();}
+  document.getElementById('zoomOut').onclick=()=>{zoom=Math.max(.35,zoom/1.2);updateZoom();draw();}
+  function updateZoom(){zoomLabel.textContent=Math.round(zoom*100)+'%';}
+
+  function renderFloorTabs(){
+    floorTabs.innerHTML='';
+    app.floors.forEach(f=>{
+      const b=document.createElement('button');
+      b.className='floor-tab'+(f.id===app.activeFloorId?' active':'');
+      b.textContent=f.name;
+      b.onclick=()=>{app.activeFloorId=f.id;selectedId=null;save();renderFloorTabs();draw();}
+      floorTabs.appendChild(b);
+    });
+  }
+
+  document.getElementById('addFloorBtn').onclick=()=>{
+    snapshot();
+    const n=app.floors.length+1;
+    const f={id:cryptoId(),name:n+'F',walls:[]};
+    app.floors.push(f);app.activeFloorId=f.id;save();renderFloorTabs();draw();toast('已新增 '+f.name);
+  };
+
+  document.getElementById('exportBtn').onclick=()=>{
+    const oldSelected=selectedId; selectedId=null; draw();
+    const link=document.createElement('a');
+    link.download=`FloorPlan-${floor().name}.png`;
+    link.href=canvas.toDataURL('image/png',1);
+    link.click();
+    selectedId=oldSelected;draw();
+  };
+
+  document.addEventListener('keydown',e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo();}
+    if(e.key==='Delete'||e.key==='Backspace'){ if(selectedId){e.preventDefault();deleteSelected();} }
+    if(e.key==='Escape'){drawing=null;dragging=null;selectedId=null;draw();}
+  });
+
+  function toast(msg){
+    toastEl.textContent=msg;toastEl.classList.add('show');
+    clearTimeout(toastEl._t);toastEl._t=setTimeout(()=>toastEl.classList.remove('show'),1500);
+  }
+
+  renderFloorTabs();
+  resize();
+  updateZoom();
+})();
+</script>
+</body>
+</html>
