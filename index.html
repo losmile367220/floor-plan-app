@@ -99,11 +99,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
 <div class="custom-panel" id="customPanel">
   <div class="lib-head"><strong id="customTitle">新增</strong><button class="close" id="closeCustom">×</button></div>
   <div style="padding:14px;display:grid;gap:10px">
-    <div id="shapeChoices" style="display:none;grid-template-columns:repeat(3,1fr);gap:8px">
-      <button class="item" data-shape="rect"><span class="ico">⬜</span><span>矩形</span></button>
-      <button class="item" data-shape="square"><span class="ico">◻️</span><span>正方形</span></button>
-      <button class="item" data-shape="circle"><span class="ico">⚪</span><span>圓形</span></button>
-    </div>
+    <div id="shapeChoices" style="display:none;grid-template-columns:repeat(4,1fr);gap:8px;max-height:55dvh;overflow:auto"></div>
     <div id="textChoices" style="display:none;gap:8px">
       <input id="customText" placeholder="輸入文字，例如：主臥、神明桌" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px">
       <div style="display:flex;gap:8px;margin-top:8px">
@@ -127,7 +123,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
 const $=id=>document.getElementById(id);
 const canvas=$('canvas'),ctx=canvas.getContext('2d'),wrap=$('canvasWrap');
 const STORAGE_KEY='floor-plan-app-v1',GRID_CM=20,BASE=.45;
-let dpr=1,tool='select',zoom=1,camera={x:80,y:80},drawing=null,panning=null,dragging=null,selected=null,placementType=null,history=[],future=[];
+let dpr=1,tool='select',zoom=1,camera={x:80,y:80},drawing=null,panning=null,dragging=null,resizing=null,selected=null,placementType=null,history=[],future=[];
 
 const CATALOG={
   '房間':[
@@ -197,10 +193,18 @@ function drawWall(wall,sel=false,preview=false){
 }
 function drawObject(o,sel=false){
  const c=W2S({x:o.x,y:o.y}),ww=o.w*BASE*zoom,hh=o.h*BASE*zoom;ctx.save();ctx.translate(c.x,c.y);ctx.rotate((o.rot||0)*Math.PI/180);
- if(sel){ctx.strokeStyle='rgba(108,99,255,.7)';ctx.lineWidth=3;ctx.setLineDash([6,4]);ctx.strokeRect(-ww/2-5,-hh/2-5,ww+10,hh+10);ctx.setLineDash([])}
+ if(sel){
+   ctx.strokeStyle='rgba(108,99,255,.75)';ctx.lineWidth=2;ctx.setLineDash([6,4]);ctx.strokeRect(-ww/2-5,-hh/2-5,ww+10,hh+10);ctx.setLineDash([]);
+   if(o.type!=='door'&&o.type!=='window'){
+     const hs=10;
+     const handles=[[-ww/2,-hh/2],[0,-hh/2],[ww/2,-hh/2],[ww/2,0],[ww/2,hh/2],[0,hh/2],[-ww/2,hh/2],[-ww/2,0]];
+     ctx.fillStyle='#fff';ctx.strokeStyle='#6c63ff';ctx.lineWidth=2;
+     handles.forEach(p=>{ctx.beginPath();ctx.rect(p[0]-hs/2,p[1]-hs/2,hs,hs);ctx.fill();ctx.stroke()});
+   }
+ }
  if(o.type==='door')drawDoor(o,ww,hh);
  else if(o.type==='window')drawWindow(o,ww,hh);
- else if(o.type==='shapeRect'||o.type==='shapeSquare'||o.type==='shapeCircle')drawShape(o,ww,hh);
+ else if(o.type && o.type.startsWith('shape'))drawShape(o,ww,hh);
  else if(o.type==='text')drawTextObject(o,ww,hh);
  else drawFurniture(o,ww,hh);
  ctx.restore()
@@ -220,10 +224,70 @@ function drawDoor(o,ww,hh){
  if(hingeRight && outward) ctx.arc(hx,0,ww,Math.PI/2,Math.PI);
  ctx.stroke()
 }
+function poly(points,fill=true){
+ ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();
+ if(fill)ctx.fill();ctx.stroke();
+}
 function drawShape(o,ww,hh){
- ctx.strokeStyle='#33343a';ctx.fillStyle='rgba(245,245,248,.7)';ctx.lineWidth=2;
- if(o.type==='shapeCircle'){ctx.beginPath();ctx.ellipse(0,0,ww/2,hh/2,0,0,Math.PI*2);ctx.fill();ctx.stroke()}
- else{ctx.fillRect(-ww/2,-hh/2,ww,hh);ctx.strokeRect(-ww/2,-hh/2,ww,hh)}
+ ctx.strokeStyle='#33343a';ctx.fillStyle='rgba(245,245,248,.78)';ctx.lineWidth=2;
+ const L=-ww/2,R=ww/2,T=-hh/2,B=hh/2,cx=0,cy=0;
+ switch(o.type){
+  case'shapeRect':
+  case'shapeSquare': ctx.fillRect(L,T,ww,hh);ctx.strokeRect(L,T,ww,hh);break;
+  case'shapeRoundRect':
+   ctx.beginPath();ctx.roundRect(L,T,ww,hh,Math.min(ww,hh)*.18);ctx.fill();ctx.stroke();break;
+  case'shapeCircle':
+  case'shapeOval':
+   ctx.beginPath();ctx.ellipse(0,0,ww/2,hh/2,0,0,Math.PI*2);ctx.fill();ctx.stroke();break;
+  case'shapeTriangle': poly([[0,T],[R,B],[L,B]]);break;
+  case'shapeRightTriangle': poly([[L,T],[R,B],[L,B]]);break;
+  case'shapeDiamond': poly([[0,T],[R,0],[0,B],[L,0]]);break;
+  case'shapeParallelogram': poly([[L+ww*.2,T],[R,T],[R-ww*.2,B],[L,B]]);break;
+  case'shapeTrapezoid': poly([[L+ww*.2,T],[R-ww*.2,T],[R,B],[L,B]]);break;
+  case'shapePentagon': {
+    let pts=[];for(let i=0;i<5;i++){let a=-Math.PI/2+i*2*Math.PI/5;pts.push([Math.cos(a)*ww/2,Math.sin(a)*hh/2])}poly(pts);break}
+  case'shapeHexagon': poly([[L+ww*.25,T],[R-ww*.25,T],[R,0],[R-ww*.25,B],[L+ww*.25,B],[L,0]]);break;
+  case'shapeOctagon': {
+    let x=ww*.22,y=hh*.22;poly([[L+x,T],[R-x,T],[R,T+y],[R,B-y],[R-x,B],[L+x,B],[L,B-y],[L,T+y]]);break}
+  case'shapeStar': {
+    let pts=[];for(let i=0;i<10;i++){let a=-Math.PI/2+i*Math.PI/5,r=i%2?0.22:0.5;pts.push([Math.cos(a)*ww*r,Math.sin(a)*hh*r])}poly(pts);break}
+  case'shapePlus':
+   poly([[-ww*.18,T],[ww*.18,T],[ww*.18,-hh*.18],[R,-hh*.18],[R,hh*.18],[ww*.18,hh*.18],[ww*.18,B],[-ww*.18,B],[-ww*.18,hh*.18],[L,hh*.18],[L,-hh*.18],[-ww*.18,-hh*.18]]);break;
+  case'shapeArrowRight':
+   poly([[L,T+hh*.25],[ww*.12,T+hh*.25],[ww*.12,T],[R,0],[ww*.12,B],[ww*.12,B-hh*.25],[L,B-hh*.25]]);break;
+  case'shapeArrowLeft':
+   poly([[R,T+hh*.25],[-ww*.12,T+hh*.25],[-ww*.12,T],[L,0],[-ww*.12,B],[-ww*.12,B-hh*.25],[R,B-hh*.25]]);break;
+  case'shapeArrowUp':
+   poly([[L+ww*.25,B],[L+ww*.25,-hh*.12],[L,-hh*.12],[0,T],[R,-hh*.12],[R-ww*.25,-hh*.12],[R-ww*.25,B]]);break;
+  case'shapeArrowDown':
+   poly([[L+ww*.25,T],[L+ww*.25,hh*.12],[L,0],[0,B],[R,0],[R-ww*.25,hh*.12],[R-ww*.25,T]]);break;
+  case'shapeChevron':
+   poly([[L,T],[0,T],[R,0],[0,B],[L,B],[0,0]]);break;
+  case'shapeHome':
+   poly([[L,0],[0,T],[R,0],[R,B],[ww*.15,B],[ww*.15,hh*.1],[-ww*.15,hh*.1],[-ww*.15,B],[L,B]]);break;
+  case'shapeCloud':
+   ctx.beginPath();
+   ctx.moveTo(L+ww*.18,hh*.2);
+   ctx.bezierCurveTo(L,-hh*.05,L+ww*.08,-hh*.28,L+ww*.28,-hh*.28);
+   ctx.bezierCurveTo(L+ww*.34,T,L+ww*.62,T,L+ww*.68,-hh*.25);
+   ctx.bezierCurveTo(R-ww*.03,-hh*.30,R,-hh*.05,R-ww*.10,hh*.10);
+   ctx.bezierCurveTo(R,hh*.30,R-ww*.18,B-hh*.08,R-ww*.34,B-hh*.08);
+   ctx.lineTo(L+ww*.24,B-hh*.08);
+   ctx.bezierCurveTo(L+ww*.05,B-hh*.08,L,hh*.37,L+ww*.18,hh*.2);
+   ctx.closePath();ctx.fill();ctx.stroke();break;
+  case'shapeHeart':
+   ctx.beginPath();ctx.moveTo(0,B);
+   ctx.bezierCurveTo(L,B-hh*.30,L,T+hh*.22,-ww*.22,T+hh*.22);
+   ctx.bezierCurveTo(-ww*.06,T+hh*.22,0,T+hh*.38,0,T+hh*.38);
+   ctx.bezierCurveTo(0,T+hh*.38,ww*.06,T+hh*.22,ww*.22,T+hh*.22);
+   ctx.bezierCurveTo(R,T+hh*.22,R,B-hh*.30,0,B);
+   ctx.fill();ctx.stroke();break;
+  case'shapeLine':
+   ctx.beginPath();ctx.moveTo(L,0);ctx.lineTo(R,0);ctx.stroke();break;
+  case'shapeDoubleArrow':
+   poly([[L,0],[-ww*.25,T],[-ww*.25,-hh*.18],[ww*.25,-hh*.18],[ww*.25,T],[R,0],[ww*.25,B],[ww*.25,hh*.18],[-ww*.25,hh*.18],[-ww*.25,B]]);break;
+  default: ctx.fillRect(L,T,ww,hh);ctx.strokeRect(L,T,ww,hh)
+ }
 }
 function drawTextObject(o,ww,hh){
  ctx.fillStyle='#222';ctx.font=`700 ${Math.max(14,Math.min(28,(o.fontSize||22)*zoom))}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
@@ -273,6 +337,20 @@ function nearestWall(p,max=90){
  }
  return bd<=max?{wall:best,p:proj,angle:Math.atan2(best.b.y-best.a.y,best.b.x-best.a.x)*180/Math.PI}:null
 }
+function objectLocalPoint(o,p){
+ const dx=p.x-o.x,dy=p.y-o.y,a=-(o.rot||0)*Math.PI/180;
+ return{x:dx*Math.cos(a)-dy*Math.sin(a),y:dx*Math.sin(a)+dy*Math.cos(a)}
+}
+function hitResizeHandle(o,p){
+ if(!o||o.type==='door'||o.type==='window')return null;
+ const q=objectLocalPoint(o,p), tol=18/(BASE*zoom);
+ const pts=[
+  ['nw',-o.w/2,-o.h/2],['n',0,-o.h/2],['ne',o.w/2,-o.h/2],['e',o.w/2,0],
+  ['se',o.w/2,o.h/2],['s',0,o.h/2],['sw',-o.w/2,o.h/2],['w',-o.w/2,0]
+ ];
+ for(const h of pts)if(Math.abs(q.x-h[1])<=tol&&Math.abs(q.y-h[2])<=tol)return h[0];
+ return null;
+}
 function hit(p){
  let best=null;
  for(let i=floor().objects.length-1;i>=0;i--){let o=floor().objects[i],dx=p.x-o.x,dy=p.y-o.y,a=-(o.rot||0)*Math.PI/180,x=dx*Math.cos(a)-dy*Math.sin(a),y=dx*Math.sin(a)+dy*Math.cos(a);if(Math.abs(x)<=o.w/2+18&&Math.abs(y)<=o.h/2+18)return{kind:'object',id:o.id}}
@@ -288,7 +366,7 @@ function setTool(t){
  if(t==='more'){openCustom('shape');return}
  tool=t;placementType=null;selected=null;updateProps();
  document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));
- $('status').textContent=t==='wall'?'畫牆：拖曳起點到終點｜吸附 20 cm 格線':t==='door'?'門：點一下牆壁放置門':t==='window'?'窗：點一下牆壁放置窗':t==='pan'?'拖曳移動畫布':'選取：點牆或家具後可拖曳';
+ $('status').textContent=t==='wall'?'畫牆：拖曳起點到終點｜吸附 20 cm 格線':t==='door'?'門：點一下牆壁放置門':t==='window'?'窗：點一下牆壁放置窗':t==='pan'?'拖曳移動畫布':'選取：點物件後可移動；拖控制點可拉大拉小';
  canvas.style.cursor=t==='wall'?'crosshair':t==='pan'?'grab':'default';draw()
 }
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
@@ -301,8 +379,8 @@ canvas.addEventListener('pointerdown',e=>{
  if(placementType){
  snapshot();let p=snapPoint(raw),o,label;
  if(placementType.startsWith('__customShape__')){
-   let s=placementType.replace('__customShape__',''),map={rect:['shapeRect','矩形',140,90],square:['shapeSquare','正方形',100,100],circle:['shapeCircle','圓形',100,100]},d=map[s];
-   o={id:id(),type:d[0],label:d[1],x:p.x,y:p.y,w:d[2],h:d[3],rot:0};label=d[1]
+   let s=placementType.replace('__customShape__',''),d=SHAPES.find(x=>x[0]===s)||SHAPES[0];
+   o={id:id(),type:d[1],label:d[3],x:p.x,y:p.y,w:d[4],h:d[5],rot:0};label=d[3]
  }else if(placementType.startsWith('__customText__')){
    let rest=placementType.replace('__customText__',''),parts=rest.split('|'),vertical=parts[0]==='V',text=decodeURIComponent(parts.slice(1).join('|'));
    o={id:id(),type:'text',label:'文字',text,vertical,x:p.x,y:p.y,w:Math.max(80,text.length*30),h:vertical?Math.max(80,text.length*32):60,rot:0,fontSize:22};label='文字'
@@ -311,16 +389,53 @@ canvas.addEventListener('pointerdown',e=>{
  }
  floor().objects.push(o);save();selected={kind:'object',id:o.id};placementType=null;setTool('select');updateProps();draw();toast(label+' 已放置');return
 }
- if(tool==='select'){selected=hit(raw);updateProps();if(selected){let obj=getSelected();dragging={start:raw,orig:JSON.parse(JSON.stringify(obj)),kind:selected.kind,moved:false}}draw()}
+ if(tool==='select'){
+   if(selected?.kind==='object'){
+     let existing=getSelected(),handle=hitResizeHandle(existing,raw);
+     if(handle){
+       resizing={handle,start:raw,orig:JSON.parse(JSON.stringify(existing)),id:existing.id,moved:false};
+       return;
+     }
+   }
+   selected=hit(raw);updateProps();
+   if(selected){let obj=getSelected();dragging={start:raw,orig:JSON.parse(JSON.stringify(obj)),kind:selected.kind,moved:false}}
+   draw()
+ }
 });
 canvas.addEventListener('pointermove',e=>{
  let s=pointer(e),raw=S2W(s);
  if(drawing){let end=snapPoint(raw),dx=Math.abs(end.x-drawing.a.x),dy=Math.abs(end.y-drawing.a.y);if(dx<40)end.x=drawing.a.x;if(dy<40)end.y=drawing.a.y;drawing.b=end;return draw()}
  if(panning){camera.x=panning.cx+s.x-panning.sx;camera.y=panning.cy+s.y-panning.sy;return draw()}
+ if(resizing){
+   let o=floor().objects.find(x=>x.id===resizing.id);if(!o)return;
+   let orig=resizing.orig,q=objectLocalPoint(orig,raw),min=20;
+   let left=-orig.w/2,right=orig.w/2,top=-orig.h/2,bottom=orig.h/2;
+   if(resizing.handle.includes('w'))left=Math.min(q.x,right-min);
+   if(resizing.handle.includes('e'))right=Math.max(q.x,left+min);
+   if(resizing.handle.includes('n'))top=Math.min(q.y,bottom-min);
+   if(resizing.handle.includes('s'))bottom=Math.max(q.y,top+min);
+   let nw=Math.max(min,right-left),nh=Math.max(min,bottom-top);
+   if(o.type==='shapeSquare'){
+     let size=Math.max(nw,nh);nw=size;nh=size;
+   }
+   const localCx=(left+right)/2,localCy=(top+bottom)/2,a=(orig.rot||0)*Math.PI/180;
+   o.x=orig.x+localCx*Math.cos(a)-localCy*Math.sin(a);
+   o.y=orig.y+localCx*Math.sin(a)+localCy*Math.cos(a);
+   o.w=snap(nw)||min;o.h=snap(nh)||min;
+   resizing.moved=true;updateProps();draw();return
+ }
  if(dragging){let obj=getSelected();if(!obj)return;if(dragging.kind==='object'){let p=snapPoint({x:dragging.orig.x+raw.x-dragging.start.x,y:dragging.orig.y+raw.y-dragging.start.y});obj.x=p.x;obj.y=p.y}else{let dx=snap(raw.x-dragging.start.x),dy=snap(raw.y-dragging.start.y);obj.a={x:dragging.orig.a.x+dx,y:dragging.orig.a.y+dy};obj.b={x:dragging.orig.b.x+dx,y:dragging.orig.b.y+dy}}dragging.moved=true;draw()}
 });
 canvas.addEventListener('pointerup',()=>{
  if(drawing){let len=Math.hypot(drawing.b.x-drawing.a.x,drawing.b.y-drawing.a.y);if(len>=GRID_CM){snapshot();floor().walls.push({id:id(),...drawing});save();toast('牆已建立')}drawing=null;draw()}
+ if(resizing){
+   if(resizing.moved){
+     let cur=JSON.parse(JSON.stringify(app)),f=cur.floors.find(x=>x.id===cur.activeFloorId),x=f.objects.find(x=>x.id===resizing.id);
+     if(x)Object.assign(x,resizing.orig);
+     history.push(JSON.stringify(cur));if(history.length>80)history.shift();future=[];save()
+   }
+   resizing=null;updateProps()
+ }
  if(dragging){if(dragging.moved){let cur=JSON.parse(JSON.stringify(app)),f=cur.floors.find(x=>x.id===cur.activeFloorId);if(dragging.kind==='object'){let x=f.objects.find(x=>x.id===selected.id);Object.assign(x,dragging.orig)}else{let x=f.walls.find(x=>x.id===selected.id);Object.assign(x,dragging.orig)}history.push(JSON.stringify(cur));future=[];save()}dragging=null}
  panning=null
 });
@@ -363,20 +478,56 @@ function closeLibrary(){$('backdrop').classList.remove('show');$('library').clas
 $('closeLibrary').onclick=closeLibrary;$('backdrop').onclick=()=>{closeLibrary();closeCustom()};
 
 
+const SHAPES=[
+ ['rect','shapeRect','▭','矩形',140,90],
+ ['square','shapeSquare','□','正方形',100,100],
+ ['roundRect','shapeRoundRect','▢','圓角矩形',140,90],
+ ['circle','shapeCircle','○','圓形',100,100],
+ ['oval','shapeOval','⬭','橢圓形',140,90],
+ ['triangle','shapeTriangle','△','三角形',120,110],
+ ['rightTriangle','shapeRightTriangle','◿','直角三角形',120,110],
+ ['diamond','shapeDiamond','◇','菱形',120,100],
+ ['parallelogram','shapeParallelogram','▱','平行四邊形',140,90],
+ ['trapezoid','shapeTrapezoid','⏢','梯形',140,90],
+ ['pentagon','shapePentagon','⬠','五邊形',110,110],
+ ['hexagon','shapeHexagon','⬡','六邊形',130,100],
+ ['octagon','shapeOctagon','⯃','八邊形',110,110],
+ ['star','shapeStar','☆','星形',120,120],
+ ['plus','shapePlus','✚','十字形',110,110],
+ ['arrowRight','shapeArrowRight','→','右箭頭',150,80],
+ ['arrowLeft','shapeArrowLeft','←','左箭頭',150,80],
+ ['arrowUp','shapeArrowUp','↑','上箭頭',80,150],
+ ['arrowDown','shapeArrowDown','↓','下箭頭',80,150],
+ ['doubleArrow','shapeDoubleArrow','↔','雙向箭頭',160,80],
+ ['chevron','shapeChevron','❯','箭號',120,100],
+ ['home','shapeHome','⌂','房屋',120,110],
+ ['cloud','shapeCloud','☁','雲形',150,100],
+ ['heart','shapeHeart','♡','愛心',120,110],
+ ['line','shapeLine','━','直線',160,40]
+];
+function renderShapes(){
+ const box=$('shapeChoices');box.innerHTML='';
+ SHAPES.forEach(d=>{
+   const b=document.createElement('button');b.className='item';
+   b.innerHTML=`<span class="ico">${d[2]}</span><span>${d[3]}</span>`;
+   b.addEventListener('click',()=>{
+     placementType='__customShape__'+d[0];closeCustom();tool='select';selected=null;
+     document.querySelectorAll('[data-tool]').forEach(x=>x.classList.remove('active'));
+     $('status').textContent='點畫布放置：'+d[3];canvas.style.cursor='crosshair'
+   });
+   box.appendChild(b)
+ })
+}
 function openCustom(kind){
  closeLibrary();
  $('backdrop').classList.add('show');$('customPanel').classList.add('show');
  $('customTitle').textContent=kind==='shape'?'新增圖形':'新增文字';
  $('shapeChoices').style.display=kind==='shape'?'grid':'none';
  $('textChoices').style.display=kind==='text'?'block':'none';
+ if(kind==='shape')renderShapes();
 }
 function closeCustom(){$('customPanel').classList.remove('show');if(!$('library').classList.contains('show'))$('backdrop').classList.remove('show')}
 $('closeCustom').onclick=closeCustom;
-document.querySelectorAll('[data-shape]').forEach(b=>b.onclick=()=>{
- const s=b.dataset.shape, map={rect:['shapeRect','矩形',140,90],square:['shapeSquare','正方形',100,100],circle:['shapeCircle','圓形',100,100]},d=map[s];
- placementType='__customShape__'+s;closeCustom();tool='select';selected=null;
- $('status').textContent='點畫布放置：'+d[1];canvas.style.cursor='crosshair'
-});
 function addCustomText(vertical){
  const text=$('customText').value.trim();if(!text)return toast('請先輸入文字');
  closeCustom();placementType='__customText__'+(vertical?'V':'H')+'|'+encodeURIComponent(text);tool='select';selected=null;
