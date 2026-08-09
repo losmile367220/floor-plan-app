@@ -20,6 +20,8 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
 .floor-tab.active{background:#18181d;color:#fff}
 .group-bar{position:fixed;left:50%;top:72px;transform:translateX(-50%);z-index:88;display:none;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:8px 10px}
 .group-bar.show{display:flex}.group-bar strong{font-size:13px;white-space:nowrap}
+.backup-panel{position:fixed;left:50%;top:78px;transform:translateX(-50%) translateY(-8px);z-index:92;display:none;width:min(420px,calc(100% - 24px));background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+.backup-panel.show{display:block;transform:translateX(-50%) translateY(0)}
 .floor-menu{position:fixed;z-index:90;display:none;min-width:170px;padding:7px;background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow)}
 .floor-menu.show{display:grid;gap:4px}.floor-menu button{padding:10px 12px;text-align:left;border-radius:9px;font-weight:700}.floor-menu button:hover{background:#f1f1f5}
 .top-actions{display:flex;gap:6px}
@@ -59,6 +61,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
     <button class="icon-btn" id="groupModeBtn" title="多選並鎖在一起">🔗</button>
     <button class="icon-btn" id="snapBtn" title="物件吸附格線：關">🧲</button>
     <button class="icon-btn" id="saveBtn" title="儲存進度">💾</button>
+    <button class="icon-btn" id="backupBtn" title="JSON 備份 / 還原">📦</button>
     <button class="icon-btn" id="exportBtn" title="匯出 PNG">⬇</button>
   </div>
 </header>
@@ -130,6 +133,21 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
   <button class="smallbtn primary" id="makeGroupBtn">🔗 鎖一起</button>
   <button class="smallbtn" id="cancelGroupBtn">取消</button>
 </div>
+<div class="backup-panel" id="backupPanel">
+  <div class="lib-head">
+    <strong>📦 專案備份 / 還原</strong>
+    <button class="close" id="closeBackup">×</button>
+  </div>
+  <div style="padding:14px;display:grid;gap:10px">
+    <button class="smallbtn primary" id="exportJsonBtn">⬇ 匯出整個專案 JSON</button>
+    <button class="smallbtn" id="importJsonBtn">⬆ 匯入專案 JSON</button>
+    <input id="importJsonInput" type="file" accept=".json,application/json" hidden>
+    <div style="font-size:12px;color:var(--muted);line-height:1.55">
+      JSON 會包含所有樓層、牆、門窗、家具、文字、圖形、群組與畫布位置。<br>
+      匯入時會先自動備份目前資料，再用匯入內容取代目前專案。
+    </div>
+  </div>
+</div>
 <div class="floor-menu" id="floorMenu">
   <button id="renameFloor">✏️ 重新命名</button>
   <button id="duplicateFloor">⧉ 複製樓層</button>
@@ -188,6 +206,47 @@ function switchFloor(fid){
 }
 function save(){storeView();localStorage.setItem(STORAGE_KEY,JSON.stringify(app))}
 function load(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))}catch(e){return null}}
+function projectBackupObject(){
+ storeView();
+ return {
+   format:'floor-plan-app',
+   backupVersion:1,
+   exportedAt:new Date().toISOString(),
+   project:JSON.parse(JSON.stringify(app))
+ }
+}
+function downloadJsonBackup(){
+ const data=projectBackupObject();
+ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json;charset=utf-8'});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement('a');
+ const stamp=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+ a.href=url;a.download='FloorPlan-backup-'+stamp+'.json';
+ document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+ toast('JSON 備份已匯出')
+}
+async function importJsonFile(file){
+ try{
+   const text=await file.text();
+   const raw=JSON.parse(text);
+   let incoming=raw?.format==='floor-plan-app'?raw.project:raw;
+   if(!incoming||!Array.isArray(incoming.floors)||!incoming.floors.length)throw new Error('不是有效的 Floor Plan 專案');
+   if(!confirm('匯入會取代目前專案。\n\n系統會先自動保存目前資料到瀏覽器備援，要繼續嗎？'))return;
+
+   // Emergency copy in localStorage before replacement.
+   localStorage.setItem(STORAGE_KEY+'-before-import-'+Date.now(),JSON.stringify(app));
+
+   app=normalize(incoming);
+   if(!app.activeFloorId||!app.floors.some(f=>f.id===app.activeFloorId))app.activeFloorId=app.floors[0].id;
+   selected=null;drawing=null;dragging=null;resizing=null;wallResizing=null;rotating=null;
+   loadView();renderFloors();updateProps();save();draw();
+   toast('專案還原成功')
+ }catch(err){
+   console.error(err);
+   alert('匯入失敗：'+(err?.message||'JSON 格式錯誤'));
+ }
+}
 function snap(v){return Math.round(v/GRID_CM)*GRID_CM}
 function snapPoint(p){return{x:snap(p.x),y:snap(p.y)}}
 function objectPoint(p){return objectSnap?snapPoint(p):{x:p.x,y:p.y}}
@@ -869,6 +928,18 @@ $('ungroupBtn').onclick=()=>{
  floor().objects.forEach(x=>{if(x.groupId===gid)delete x.groupId});
  save();updateProps();draw();toast('已解除群組')
 };
+
+
+$('backupBtn').onclick=()=>{$('backupPanel').classList.toggle('show')};
+$('closeBackup').onclick=()=>{$('backupPanel').classList.remove('show')};
+$('exportJsonBtn').onclick=downloadJsonBackup;
+$('importJsonBtn').onclick=()=>$('importJsonInput').click();
+$('importJsonInput').addEventListener('change',async e=>{
+ const file=e.target.files?.[0];
+ if(file)await importJsonFile(file);
+ e.target.value='';
+ $('backupPanel').classList.remove('show')
+});
 
 $('snapBtn').onclick=()=>{
  objectSnap=!objectSnap;
