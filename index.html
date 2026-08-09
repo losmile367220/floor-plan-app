@@ -26,7 +26,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
 .icon-btn,.tool{min-width:42px;height:42px;border-radius:12px;background:#f1f1f6;display:flex;align-items:center;justify-content:center;font-weight:750}
 .workspace{flex:1;min-height:0;display:flex}.sidebar{width:96px;padding:10px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:7px;z-index:10;overflow:auto}
 .tool{height:58px;flex-direction:column;gap:2px;font-size:12px;flex-shrink:0}.tool .emoji{font-size:20px}.tool.active{background:#18181d;color:#fff}
-.canvas-wrap{position:relative;flex:1;overflow:hidden;background:#ececf2;touch-action:none}canvas{display:block;width:100%;height:100%;background:#fff;touch-action:none}
+.canvas-wrap{position:relative;flex:1;overflow:hidden;background:#ececf2;touch-action:none}canvas{display:block;width:100%;height:100%;background:#fff;touch-action:none;user-select:none;-webkit-user-select:none}
 .status{position:absolute;left:14px;top:14px;background:rgba(255,255,255,.94);box-shadow:var(--shadow);padding:8px 11px;border-radius:10px;font-size:12px;color:var(--muted);pointer-events:none;max-width:70%}
 .zoom{position:absolute;right:14px;bottom:14px;background:#fff;box-shadow:var(--shadow);border-radius:14px;padding:6px;display:flex;align-items:center;gap:4px}
 .zoom button{width:38px;height:38px;border-radius:10px;background:#f1f1f6;font-size:18px;font-weight:800}.zoom span{min-width:50px;text-align:center;font-size:12px;color:var(--muted)}
@@ -142,7 +142,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
 const $=id=>document.getElementById(id);
 const canvas=$('canvas'),ctx=canvas.getContext('2d'),wrap=$('canvasWrap');
 const STORAGE_KEY='floor-plan-app-v1',GRID_CM=20,BASE=.45;
-let dpr=1,tool='select',zoom=1,camera={x:80,y:80},drawing=null,panning=null,dragging=null,resizing=null,wallResizing=null,rotating=null,selected=null,placementType=null,history=[],future=[],objectSnap=false,multiSelectMode=false,multiSelected=new Set();
+let dpr=1,tool='select',zoom=1,camera={x:80,y:80},drawing=null,panning=null,dragging=null,resizing=null,wallResizing=null,rotating=null,selected=null,placementType=null,history=[],future=[],objectSnap=false,multiSelectMode=false,multiSelected=new Set(),hoverTarget=null;
 
 const CATALOG={
   '房間':[
@@ -584,8 +584,23 @@ function hitResizeHandle(o,p){
 }
 function hit(p){
  let best=null;
- for(let i=floor().objects.length-1;i>=0;i--){let o=floor().objects[i],dx=p.x-o.x,dy=p.y-o.y,a=-(o.rot||0)*Math.PI/180,x=dx*Math.cos(a)-dy*Math.sin(a),y=dx*Math.sin(a)+dy*Math.cos(a);if(Math.abs(x)<=o.w/2+18&&Math.abs(y)<=o.h/2+18)return{kind:'object',id:o.id}}
- let limit=28/(BASE*zoom),bd=Infinity;for(const w of floor().walls){let d=segDist(p,w.a,w.b);if(d<limit&&d<bd){bd=d;best={kind:'wall',id:w.id}}}return best
+ // Objects are tested from topmost to bottommost.
+ // The whole visible body is draggable — users do not need to grab the border.
+ for(let i=floor().objects.length-1;i>=0;i--){
+   const o=floor().objects[i],q=objectLocalPoint(o,p);
+   const pad=Math.max(10,14/(BASE*zoom));
+   const halfW=Math.max((o.w||20)/2,22/(BASE*zoom));
+   const halfH=Math.max((o.h||20)/2,22/(BASE*zoom));
+   if(Math.abs(q.x)<=halfW+pad && Math.abs(q.y)<=halfH+pad){
+     return{kind:'object',id:o.id}
+   }
+ }
+ let limit=28/(BASE*zoom),bd=Infinity;
+ for(const w of floor().walls){
+   let d=segDist(p,w.a,w.b);
+   if(d<limit&&d<bd){bd=d;best={kind:'wall',id:w.id}}
+ }
+ return best
 }
 function segDist(p,a,b){let dx=b.x-a.x,dy=b.y-a.y;if(!dx&&!dy)return Math.hypot(p.x-a.x,p.y-a.y);let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy);t=Math.max(0,Math.min(1,t));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)}
 function getSelected(){if(!selected)return null;return selected.kind==='wall'?floor().walls.find(x=>x.id===selected.id):floor().objects.find(x=>x.id===selected.id)}
@@ -605,7 +620,7 @@ function enterGroupMode(){
 }
 function exitGroupMode(){
  multiSelectMode=false;multiSelected.clear();$('groupModeBtn').classList.remove('primary');
- updateGroupBar();$('status').textContent='選取：物件可自由移動；控制點縮放，上方圓點旋轉。磁鐵可切換格線吸附';draw()
+ updateGroupBar();$('status').textContent='選取：直接按住物件中間拖曳即可移動；方形控制點縮放，上方圓點旋轉';draw()
 }
 
 
@@ -617,7 +632,7 @@ function setTool(t){
  if(t==='more'){openCustom('shape');return}
  tool=t;placementType=null;selected=null;updateProps();
  document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));
- $('status').textContent=t==='wall'?'畫牆：拖曳起點到終點｜吸附 20 cm 格線':t==='door'?'門：可放任意位置；靠近牆時會自動貼齊':t==='window'?'窗：可放任意位置；靠近牆時會自動貼齊':t==='pan'?'拖曳移動畫布':'選取：物件可自由移動；控制點縮放，上方圓點旋轉。磁鐵可切換格線吸附';
+ $('status').textContent=t==='wall'?'畫牆：拖曳起點到終點｜吸附 20 cm 格線':t==='door'?'門：可放任意位置；靠近牆時會自動貼齊':t==='window'?'窗：可放任意位置；靠近牆時會自動貼齊':t==='pan'?'拖曳移動畫布':'選取：直接按住物件中間拖曳即可移動；方形控制點縮放，上方圓點旋轉';
  canvas.style.cursor=t==='wall'?'crosshair':t==='pan'?'grab':'default';draw()
 }
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
@@ -690,7 +705,8 @@ canvas.addEventListener('pointerdown',e=>{
        dragging={
          start:raw,kind:'object',moved:false,before:JSON.stringify(app),
          originals:members.map(x=>({id:x.id,x:x.x,y:x.y}))
-       }
+       };
+       canvas.style.cursor='grabbing';
      }else{
        dragging={start:raw,orig:JSON.parse(JSON.stringify(obj)),kind:'wall',moved:false,before:JSON.stringify(app)}
      }
@@ -700,6 +716,11 @@ canvas.addEventListener('pointerdown',e=>{
 });
 canvas.addEventListener('pointermove',e=>{
  let s=pointer(e),raw=S2W(s);
+ if(!drawing&&!panning&&!dragging&&!resizing&&!wallResizing&&!rotating&&tool==='select'&&!multiSelectMode){
+   const h=hit(raw);
+   hoverTarget=h;
+   canvas.style.cursor=h?.kind==='object'?'grab':h?.kind==='wall'?'pointer':'default';
+ }
  if(drawing){let end=snapPoint(raw),dx=Math.abs(end.x-drawing.a.x),dy=Math.abs(end.y-drawing.a.y);if(dx<40)end.x=drawing.a.x;if(dy<40)end.y=drawing.a.y;drawing.b=end;return draw()}
  if(panning){camera.x=panning.cx+s.x-panning.sx;camera.y=panning.cy+s.y-panning.sy;return draw()}
  if(wallResizing){
@@ -779,7 +800,8 @@ canvas.addEventListener('pointerup',()=>{
    if(dragging.moved){
      history.push(dragging.before);if(history.length>80)history.shift();future=[];save()
    }
-   dragging=null
+   dragging=null;
+   if(tool==='select')canvas.style.cursor='default'
  }
  if(panning){storeView();save()}panning=null
 });
