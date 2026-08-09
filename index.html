@@ -18,6 +18,8 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
 .brand{font-size:19px;font-weight:850;white-space:nowrap}.floor-tabs{display:flex;gap:6px;overflow:auto;flex:1}
 .floor-tab{padding:8px 12px;background:#f0f0f5;border-radius:10px;font-weight:750;white-space:nowrap}
 .floor-tab.active{background:#18181d;color:#fff}
+.group-bar{position:fixed;left:50%;top:72px;transform:translateX(-50%);z-index:88;display:none;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:8px 10px}
+.group-bar.show{display:flex}.group-bar strong{font-size:13px;white-space:nowrap}
 .floor-menu{position:fixed;z-index:90;display:none;min-width:170px;padding:7px;background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow)}
 .floor-menu.show{display:grid;gap:4px}.floor-menu button{padding:10px 12px;text-align:left;border-radius:9px;font-weight:700}.floor-menu button:hover{background:#f1f1f5}
 .top-actions{display:flex;gap:6px}
@@ -40,6 +42,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
 .props{position:fixed;right:16px;top:78px;width:225px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);z-index:25;padding:12px;display:none}.props.show{display:block}.props h3{margin:0 0 10px;font-size:15px}.row{display:flex;gap:7px;align-items:center;margin-top:8px}.row label{font-size:12px;color:var(--muted);width:48px}.row input{min-width:0;flex:1;padding:8px;border:1px solid var(--line);border-radius:9px}.smallbtn{flex:1;padding:9px 8px;border-radius:9px;background:#f1f1f5;font-weight:750;font-size:12px}.danger{color:var(--danger)}
 .toast{position:fixed;left:50%;top:78px;transform:translateX(-50%) translateY(-10px);padding:9px 14px;background:#18181d;color:#fff;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:.18s;z-index:80}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 @media(max-width:760px){
+ .group-bar{top:62px;max-width:calc(100% - 20px)}
  header{height:56px;padding:0 9px}.brand{font-size:16px}.sidebar{display:none}.bottom{display:flex;gap:4px}.top-actions .optional{display:none}.status{top:9px;left:9px}.zoom{right:9px;bottom:9px}.items{grid-template-columns:repeat(3,1fr)}.props{top:auto;right:10px;left:10px;bottom:82px;width:auto}.floor-tab{padding:7px 10px}
 }
 </style>
@@ -53,6 +56,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
     <button class="icon-btn optional" id="undoBtn" title="復原">↶</button>
     <button class="icon-btn optional" id="redoBtn" title="重做">↷</button>
     <button class="icon-btn" id="addFloorBtn" title="新增樓層">＋F</button>
+    <button class="icon-btn" id="groupModeBtn" title="多選並鎖在一起">🔗</button>
     <button class="icon-btn" id="snapBtn" title="物件吸附格線：關">🧲</button>
     <button class="icon-btn" id="saveBtn" title="儲存進度">💾</button>
     <button class="icon-btn" id="exportBtn" title="匯出 PNG">⬇</button>
@@ -97,6 +101,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
   <div class="row" id="stairsDirectionRow" style="display:none"><label>樓梯</label><button class="smallbtn" id="stairsDirection">切換 上 / 下</button></div>
   <div class="row" id="textDirectionRow" style="display:none"><label>文字</label><button class="smallbtn" id="textDirection">橫 ↔ 直</button></div>
   <div class="row"><button class="smallbtn" id="rotateLeft">↶ 旋轉</button><button class="smallbtn" id="rotateRight">↷ 旋轉</button></div>
+  <div class="row" id="groupInfoRow" style="display:none"><button class="smallbtn" id="ungroupBtn">🔓 解除群組</button></div>
   <div class="row"><button class="smallbtn" id="duplicateBtn">⧉ 複製</button><button class="smallbtn danger" id="propDelete">🗑 刪除</button></div>
 </div>
 
@@ -120,6 +125,11 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
   <div class="cats" id="cats"></div>
   <div class="items" id="items"></div>
 </div>
+<div class="group-bar" id="groupBar">
+  <strong id="groupCount">已選 0 個</strong>
+  <button class="smallbtn primary" id="makeGroupBtn">🔗 鎖一起</button>
+  <button class="smallbtn" id="cancelGroupBtn">取消</button>
+</div>
 <div class="floor-menu" id="floorMenu">
   <button id="renameFloor">✏️ 重新命名</button>
   <button id="duplicateFloor">⧉ 複製樓層</button>
@@ -132,7 +142,7 @@ header{height:62px;display:flex;align-items:center;gap:10px;padding:0 14px;backg
 const $=id=>document.getElementById(id);
 const canvas=$('canvas'),ctx=canvas.getContext('2d'),wrap=$('canvasWrap');
 const STORAGE_KEY='floor-plan-app-v1',GRID_CM=20,BASE=.45;
-let dpr=1,tool='select',zoom=1,camera={x:80,y:80},drawing=null,panning=null,dragging=null,resizing=null,wallResizing=null,rotating=null,selected=null,placementType=null,history=[],future=[],objectSnap=false;
+let dpr=1,tool='select',zoom=1,camera={x:80,y:80},drawing=null,panning=null,dragging=null,resizing=null,wallResizing=null,rotating=null,selected=null,placementType=null,history=[],future=[],objectSnap=false,multiSelectMode=false,multiSelected=new Set();
 
 const CATALOG={
   '房間':[
@@ -199,7 +209,11 @@ function pointer(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.
 function draw(){
  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);drawGrid(w,h);
  floor().walls.forEach(x=>drawWall(x,selected?.kind==='wall'&&selected.id===x.id));
- floor().objects.forEach(x=>drawObject(x,selected?.kind==='object'&&selected.id===x.id));
+ const activeObj=selected?.kind==='object'?floor().objects.find(o=>o.id===selected.id):null;
+ floor().objects.forEach(x=>{
+   const sameGroup=!!(activeObj?.groupId && x.groupId===activeObj.groupId);
+   drawObject(x,(selected?.kind==='object'&&selected.id===x.id)||sameGroup||multiSelected.has(x.id))
+ });
  if(drawing)drawWall({...drawing,id:'preview'},false,true)
 }
 function drawGrid(w,h){
@@ -405,8 +419,28 @@ function hit(p){
 }
 function segDist(p,a,b){let dx=b.x-a.x,dy=b.y-a.y;if(!dx&&!dy)return Math.hypot(p.x-a.x,p.y-a.y);let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy);t=Math.max(0,Math.min(1,t));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)}
 function getSelected(){if(!selected)return null;return selected.kind==='wall'?floor().walls.find(x=>x.id===selected.id):floor().objects.find(x=>x.id===selected.id)}
+function groupMembers(o){
+ if(!o?.groupId)return o?[o]:[];
+ return floor().objects.filter(x=>x.groupId===o.groupId)
+}
+function updateGroupBar(){
+ $('groupBar').classList.toggle('show',multiSelectMode);
+ $('groupCount').textContent='已選 '+multiSelected.size+' 個';
+}
+function enterGroupMode(){
+ multiSelectMode=true;multiSelected.clear();selected=null;updateProps();updateGroupBar();
+ $('groupModeBtn').classList.add('primary');
+ $('status').textContent='多選模式：依序點選文字、圖形或家具，再按「鎖一起」';
+ draw()
+}
+function exitGroupMode(){
+ multiSelectMode=false;multiSelected.clear();$('groupModeBtn').classList.remove('primary');
+ updateGroupBar();$('status').textContent='選取：物件可自由移動；控制點縮放，上方圓點旋轉。磁鐵可切換格線吸附';draw()
+}
+
 
 function setTool(t){
+ if(multiSelectMode)exitGroupMode();
  if(t==='library'){openLibrary();return}
  if(t==='shape'){openCustom('shape');return}
  if(t==='text'){openCustom('text');return}
@@ -449,6 +483,14 @@ canvas.addEventListener('pointerdown',e=>{
  floor().objects.push(o);save();selected={kind:'object',id:o.id};placementType=null;setTool('select');updateProps();draw();toast(label+' 已放置');return
 }
  if(tool==='select'){
+   if(multiSelectMode){
+     const h=hit(raw);
+     if(h?.kind==='object'){
+       if(multiSelected.has(h.id))multiSelected.delete(h.id);else multiSelected.add(h.id);
+       updateGroupBar();draw()
+     }else toast('群組只能選擇文字、圖形或家具');
+     return
+   }
    if(selected?.kind==='wall'){
      let existing=getSelected(),end=hitWallEndpoint(existing,raw);
      if(end){
@@ -471,7 +513,18 @@ canvas.addEventListener('pointerdown',e=>{
      }
    }
    selected=hit(raw);updateProps();
-   if(selected){let obj=getSelected();dragging={start:raw,orig:JSON.parse(JSON.stringify(obj)),kind:selected.kind,moved:false}}
+   if(selected){
+     let obj=getSelected();
+     if(selected.kind==='object'){
+       const members=groupMembers(obj);
+       dragging={
+         start:raw,kind:'object',moved:false,before:JSON.stringify(app),
+         originals:members.map(x=>({id:x.id,x:x.x,y:x.y}))
+       }
+     }else{
+       dragging={start:raw,orig:JSON.parse(JSON.stringify(obj)),kind:'wall',moved:false,before:JSON.stringify(app)}
+     }
+   }
    draw()
  }
 });
@@ -515,9 +568,16 @@ canvas.addEventListener('pointermove',e=>{
    resizing.moved=true;updateProps();draw();return
  }
  if(dragging){let obj=getSelected();if(!obj)return;if(dragging.kind==='object'){
-   let p=objectPoint({x:dragging.orig.x+raw.x-dragging.start.x,y:dragging.orig.y+raw.y-dragging.start.y});
-   obj.x=p.x;obj.y=p.y
- }else{let dx=snap(raw.x-dragging.start.x),dy=snap(raw.y-dragging.start.y);obj.a={x:dragging.orig.a.x+dx,y:dragging.orig.a.y+dy};obj.b={x:dragging.orig.b.x+dx,y:dragging.orig.b.y+dy}}dragging.moved=true;draw()}
+   const dx=raw.x-dragging.start.x,dy=raw.y-dragging.start.y;
+   dragging.originals.forEach(orig=>{
+     const member=floor().objects.find(x=>x.id===orig.id);if(!member)return;
+     const p=objectPoint({x:orig.x+dx,y:orig.y+dy});member.x=p.x;member.y=p.y
+   })
+ }else{
+   let dx=snap(raw.x-dragging.start.x),dy=snap(raw.y-dragging.start.y);
+   obj.a={x:dragging.orig.a.x+dx,y:dragging.orig.a.y+dy};obj.b={x:dragging.orig.b.x+dx,y:dragging.orig.b.y+dy}
+ }
+ dragging.moved=true;draw()}
 });
 canvas.addEventListener('pointerup',()=>{
  if(drawing){let len=Math.hypot(drawing.b.x-drawing.a.x,drawing.b.y-drawing.a.y);if(len>=GRID_CM){snapshot();floor().walls.push({id:id(),...drawing});save();toast('牆已建立')}drawing=null;draw()}
@@ -545,7 +605,12 @@ canvas.addEventListener('pointerup',()=>{
    }
    resizing=null;updateProps()
  }
- if(dragging){if(dragging.moved){let cur=JSON.parse(JSON.stringify(app)),f=cur.floors.find(x=>x.id===cur.activeFloorId);if(dragging.kind==='object'){let x=f.objects.find(x=>x.id===selected.id);Object.assign(x,dragging.orig)}else{let x=f.walls.find(x=>x.id===selected.id);Object.assign(x,dragging.orig)}history.push(JSON.stringify(cur));future=[];save()}dragging=null}
+ if(dragging){
+   if(dragging.moved){
+     history.push(dragging.before);if(history.length>80)history.shift();future=[];save()
+   }
+   dragging=null
+ }
  if(panning){storeView();save()}panning=null
 });
 canvas.addEventListener('wheel',e=>{e.preventDefault();let s=pointer(e),before=S2W(s);zoom=Math.max(.35,Math.min(3,zoom*(e.deltaY<0?1.1:.9)));let after=W2S(before);camera.x+=s.x-after.x;camera.y+=s.y-after.y;updateZoom();storeView();save();draw()},{passive:false});
@@ -596,6 +661,23 @@ $('deleteFloor').onclick=()=>{
  if(wasActive)app.activeFloorId=app.floors[0].id;
  selected=null;loadView();save();renderFloors();updateProps();draw();closeFloorMenu();toast('樓層已刪除')
 };
+
+$('groupModeBtn').onclick=()=>multiSelectMode?exitGroupMode():enterGroupMode();
+$('cancelGroupBtn').onclick=exitGroupMode;
+$('makeGroupBtn').onclick=()=>{
+ if(multiSelected.size<2)return toast('至少選 2 個物件才能鎖一起');
+ snapshot();const gid=id();
+ floor().objects.forEach(o=>{if(multiSelected.has(o.id))o.groupId=gid});
+ const first=[...multiSelected][0];selected={kind:'object',id:first};
+ save();exitGroupMode();updateProps();draw();toast('已鎖成一組，拖其中一個會一起移動')
+};
+$('ungroupBtn').onclick=()=>{
+ const o=getSelected();if(!o?.groupId)return;
+ snapshot();const gid=o.groupId;
+ floor().objects.forEach(x=>{if(x.groupId===gid)delete x.groupId});
+ save();updateProps();draw();toast('已解除群組')
+};
+
 $('snapBtn').onclick=()=>{
  objectSnap=!objectSnap;
  $('snapBtn').classList.toggle('primary',objectSnap);
@@ -611,6 +693,7 @@ function updateProps(){
  $('doorDirectionRow').style.display=o.type==='door'?'flex':'none';
  $('stairsDirectionRow').style.display=o.type==='stairs'?'flex':'none';
  $('textDirectionRow').style.display=o.type==='text'?'flex':'none';
+ $('groupInfoRow').style.display=o.groupId?'flex':'none';
 }
 function changeSize(){let o=getSelected();if(!o||selected.kind!=='object')return;snapshot();o.w=Math.max(20,+$('propW').value||o.w);o.h=Math.max(20,+$('propH').value||o.h);save();draw()}
 $('propW').onchange=changeSize;$('propH').onchange=changeSize;
@@ -620,7 +703,7 @@ $('doorLeftRight').onclick=()=>{let o=getSelected();if(!o||o.type!=='door')retur
 $('doorInOut').onclick=()=>{let o=getSelected();if(!o||o.type!=='door')return;snapshot();o.outward=!o.outward;save();draw()};
 $('stairsDirection').onclick=()=>{let o=getSelected();if(!o||o.type!=='stairs')return;snapshot();o.stairsDown=!o.stairsDown;save();draw()};
 $('textDirection').onclick=()=>{let o=getSelected();if(!o||o.type!=='text')return;snapshot();o.vertical=!o.vertical;save();draw()};
-$('duplicateBtn').onclick=()=>{let o=getSelected();if(!o||selected.kind!=='object')return;snapshot();let c={...o,id:id(),x:o.x+40,y:o.y+40};floor().objects.push(c);selected={kind:'object',id:c.id};save();updateProps();draw();toast('已複製')};
+$('duplicateBtn').onclick=()=>{let o=getSelected();if(!o||selected.kind!=='object')return;snapshot();let c={...o,id:id(),x:o.x+40,y:o.y+40};delete c.groupId;floor().objects.push(c);selected={kind:'object',id:c.id};save();updateProps();draw();toast('已複製')};
 
 function renderLibrary(cat=Object.keys(CATALOG)[0]){
  $('cats').innerHTML='';Object.keys(CATALOG).forEach(c=>{let b=document.createElement('button');b.className='cat'+(c===cat?' active':'');b.textContent=c;b.onclick=()=>renderLibrary(c);$('cats').appendChild(b)});
@@ -689,7 +772,10 @@ function addCustomText(vertical){
 }
 $('addTextH').onclick=()=>addCustomText(false);$('addTextV').onclick=()=>addCustomText(true);
 
-document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}if((e.key==='Delete'||e.key==='Backspace')&&selected){e.preventDefault();deleteSelected()}if(e.key==='Escape'){drawing=null;dragging=null;resizing=null;wallResizing=null;rotating=null;selected=null;placementType=null;updateProps();draw()}});
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}if((e.key==='Delete'||e.key==='Backspace')&&selected){e.preventDefault();deleteSelected()}if(e.key==='Escape'){
+   if(multiSelectMode){exitGroupMode();return}
+   drawing=null;dragging=null;resizing=null;wallResizing=null;rotating=null;selected=null;placementType=null;updateProps();draw()
+ }});
 function toast(m){$('toast').textContent=m;$('toast').classList.add('show');clearTimeout($('toast')._t);$('toast')._t=setTimeout(()=>$('toast').classList.remove('show'),1500)}
 
 loadView();renderFloors();resize();updateZoom();save();
